@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TablePlaner 💍</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ── SIDEBAR ──────────────────────────────────────────────── -->
+  <div class="sidebar">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('sala')">Sala</button>
+      <button class="tab" onclick="switchTab('stolY')">Stoły</button>
+      <button class="tab" onclick="switchTab('goscie')">Goście</button>
+      <button class="tab" onclick="switchTab('import')">Import</button>
+    </div>
+
+    <!-- TAB: Sala -->
+    <div class="tab-panel active" id="tab-sala">
+      <div class="sec-title">Rozmiar sali</div>
+      <div class="row">
+        <label>Szerokość</label>
+        <input type="number" id="roomW" value="1200" min="400" max="3000" step="50">
+        <span style="font-size:11px;color:#888">cm</span>
+      </div>
+      <div class="row">
+        <label>Długość</label>
+        <input type="number" id="roomH" value="800" min="300" max="2000" step="50">
+        <span style="font-size:11px;color:#888">cm</span>
+      </div>
+      <div class="row">
+        <label>Preset</label>
+        <select id="roomPreset" onchange="applyPreset()">
+          <option value="">Własny</option>
+          <option value="800x600">Mała (800×600)</option>
+          <option value="1200x800" selected>Średnia (1200×800)</option>
+          <option value="1600x1000">Duża (1600×1000)</option>
+          <option value="2000x1200">Bardzo duża</option>
+        </select>
+      </div>
+      <hr class="sep">
+      <div class="stats-row">
+        <div class="stat-pill">Stoły: <span id="st1">0</span></div>
+        <div class="stat-pill">Miejsc: <span id="st2">0</span></div>
+        <div class="stat-pill">Goście: <span id="st3">0</span></div>
+        <div class="stat-pill">Bez miejsca: <span id="st4">0</span></div>
+      </div>
+      <button class="btn" onclick="autoArrange()">⊞ Auto-układ stołów</button>
+      <button class="btn" onclick="clearTables()">↺ Wyczyść stoły</button>
+    </div>
+
+    <!-- TAB: Stoły -->
+    <div class="tab-panel" id="tab-stolY">
+      <div class="sec-title">Typ stołu</div>
+      <div class="type-btns">
+        <button class="type-btn active" data-type="circle_180" onclick="pickType(this)">
+          Okrągły<span class="dim-badge">ø 180 cm</span>
+        </button>
+        <button class="type-btn" data-type="rect_180x90" onclick="pickType(this)">
+          Prostokątny<span class="dim-badge">180×90 cm</span>
+        </button>
+        <button class="type-btn" data-type="rect_160x90" onclick="pickType(this)">
+          Młodzi<span class="dim-badge">160×90 cm</span>
+        </button>
+        <button class="type-btn" data-type="custom" onclick="pickType(this)">
+          Własny<span class="dim-badge">dowolny</span>
+        </button>
+      </div>
+
+      <div id="customDims">
+        <div class="row">
+          <label>Kształt</label>
+          <select id="customShape" onchange="toggleCustomShape()">
+            <option value="circle">Okrągły</option>
+            <option value="rect">Prostokątny</option>
+          </select>
+        </div>
+        <div class="row" id="rowDiam">
+          <label>Średnica</label>
+          <input type="number" id="customD" value="180" min="60" max="400">
+          <span style="font-size:11px;color:#888">cm</span>
+        </div>
+        <div class="row" id="rowW" style="display:none">
+          <label>Szerokość</label>
+          <input type="number" id="customW" value="180" min="60" max="500">
+          <span style="font-size:11px;color:#888">cm</span>
+        </div>
+        <div class="row" id="rowDep" style="display:none">
+          <label>Głębokość</label>
+          <input type="number" id="customDepth" value="90" min="40" max="300">
+          <span style="font-size:11px;color:#888">cm</span>
+        </div>
+      </div>
+
+      <div class="row"><label>Nazwa</label><input type="text" id="newName" placeholder="np. Rodzina"/></div>
+      <div class="row"><label>Miejsca</label><input type="number" id="newSeats" value="10" min="2" max="30"></div>
+      <div class="row">
+        <label>Kolor</label>
+        <div class="swatches" id="newColorSwatches">
+          <div class="swatch active" style="background:#5DCAA5" data-color="#5DCAA5" onclick="pickNewColor(this)"></div>
+          <div class="swatch" style="background:#7F77DD" data-color="#7F77DD" onclick="pickNewColor(this)"></div>
+          <div class="swatch" style="background:#F0997B" data-color="#F0997B" onclick="pickNewColor(this)"></div>
+          <div class="swatch" style="background:#EF9F27" data-color="#EF9F27" onclick="pickNewColor(this)"></div>
+          <div class="swatch" style="background:#85B7EB" data-color="#85B7EB" onclick="pickNewColor(this)"></div>
+          <div class="swatch" style="background:#ED93B1" data-color="#ED93B1" onclick="pickNewColor(this)"></div>
+          <div class="swatch" style="background:#D3D1C7" data-color="#D3D1C7" onclick="pickNewColor(this)"></div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="addTable()">+ Dodaj stół</button>
+      <hr class="sep">
+      <div class="sec-title">Stoły (<span id="tableCount">0</span>)</div>
+      <div class="tbl-list" id="tblList"></div>
+      <button class="btn btn-sm" style="margin-top:2px" onclick="deleteSelected()">🗑 Usuń zaznaczony</button>
+    </div>
+
+    <!-- TAB: Goście -->
+    <div class="tab-panel" id="tab-goscie" style="min-height:0">
+      <input class="search-box" id="guestSearch" placeholder="Szukaj gościa..." oninput="renderGuestList()">
+      <div class="stats-row">
+        <div class="stat-pill">Wszyscy: <span id="guestCount">0</span></div>
+        <div class="stat-pill">Bez miejsca: <span id="st4b">0</span></div>
+      </div>
+      <div class="guest-list-panel" id="guestListPanel"></div>
+      <hr class="sep">
+      <div class="sec-title">Dodaj ręcznie</div>
+      <div class="row"><label>Imię</label><input type="text" id="manualName" placeholder="Jan Kowalski"/></div>
+      <div class="row">
+        <label>Grupa</label>
+        <select id="manualGroup">
+          <option value="family">Rodzina</option>
+          <option value="friend">Przyjaciel</option>
+          <option value="work">Praca</option>
+          <option value="other">Inne</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="addGuestManual()">+ Dodaj gościa</button>
+      <button class="btn" onclick="clearGuests()">🗑 Usuń wszystkich gości</button>
+    </div>
+
+    <!-- TAB: Import -->
+    <div class="tab-panel" id="tab-import">
+      <div class="sec-title">Import z CSV</div>
+      <div style="font-size:12px;color:#888;line-height:1.6">
+        Kolumny: <code style="font-size:11px;background:#f0f0ee;padding:2px 5px;border-radius:4px">imie, nazwisko, grupa, stol</code><br>
+        Separator: przecinek lub średnik.
+      </div>
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('csvFile').click()">
+        ↑ Kliknij lub przeciągnij plik CSV
+        <input type="file" id="csvFile" accept=".csv,.txt" style="display:none" onchange="handleFileSelect(event)">
+      </div>
+      <div id="csvStatus" style="display:none"></div>
+      <div id="csvPreviewBox" style="display:none">
+        <div class="sec-title">Podgląd</div>
+        <div class="csv-preview" id="csvPreview"></div>
+      </div>
+      <button class="btn btn-primary" id="importBtn" style="display:none" onclick="confirmImport()">✓ Importuj gości</button>
+      <hr class="sep">
+      <div class="csv-preview">imie,nazwisko,grupa,stol
+Anna,Kowalska,family,Rodzina
+Piotr,Nowak,family,</div>
+      <button class="btn" style="margin-top:4px" onclick="loadExample()">📄 Wczytaj przykład</button>
+    </div>
+  </div>
+
+  <!-- ── CANVAS AREA ───────────────────────────────────────────── -->
+  <div class="canvas-wrap">
+    <div class="canvas-toolbar">
+      <span>Zoom:</span>
+      <input type="range" id="zoomSlider" min="10" max="200" value="60" step="5"
+             oninput="setZoom(this.value)" style="width:80px">
+      <span id="zoomVal" style="font-weight:500;color:var(--color-text-primary)">60%</span>
+      <span>|</span>
+      <span id="roomDimLabel">1200×800 cm</span>
+      <span style="margin-left:auto;font-size:11px">Przeciągnij · kliknij aby zaznaczyć · ← → obracaj</span>
+    </div>
+
+    <div class="canvas-scroll" id="canvasScroll">
+      <canvas id="floorCanvas"></canvas>
+    </div>
+
+    <!-- Bottom props panel -->
+    <div class="props-panel" id="propsPanel" style="display:none">
+      <div class="props-row">
+        <strong id="propTitle" style="font-size:12px;font-weight:500">Stół</strong>
+        <label>Nazwa</label>
+        <input type="text" id="propName" oninput="updateProp()" style="font-size:12px;width:100px">
+        <label>Miejsca</label>
+        <input type="number" id="propSeats" min="2" max="40" oninput="updateProp()" style="font-size:12px;width:46px">
+        <div class="swatches" id="propColorSwatches">
+          <div class="swatch active" style="background:#5DCAA5" data-color="#5DCAA5" onclick="pickPropColor(this)"></div>
+          <div class="swatch" style="background:#7F77DD" data-color="#7F77DD" onclick="pickPropColor(this)"></div>
+          <div class="swatch" style="background:#F0997B" data-color="#F0997B" onclick="pickPropColor(this)"></div>
+          <div class="swatch" style="background:#EF9F27" data-color="#EF9F27" onclick="pickPropColor(this)"></div>
+          <div class="swatch" style="background:#85B7EB" data-color="#85B7EB" onclick="pickPropColor(this)"></div>
+          <div class="swatch" style="background:#ED93B1" data-color="#ED93B1" onclick="pickPropColor(this)"></div>
+          <div class="swatch" style="background:#D3D1C7" data-color="#D3D1C7" onclick="pickPropColor(this)"></div>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="deleteSelected()">🗑 Usuń</button>
+      </div>
+
+      <div class="props-row">
+        <span style="font-size:12px;color:#888">Obrót:</span>
+        <div class="rot-btns">
+          <button class="rot-btn" onclick="rotateSelected(-90)">↺ -90°</button>
+          <button class="rot-btn" onclick="rotateSelected(-15)">↺ -15°</button>
+          <button class="rot-btn" onclick="rotateSelected(-5)">↺ -5°</button>
+          <button class="rot-btn" onclick="rotateSelected(5)">↻ +5°</button>
+          <button class="rot-btn" onclick="rotateSelected(15)">↻ +15°</button>
+          <button class="rot-btn" onclick="rotateSelected(90)">↻ +90°</button>
+        </div>
+        <span id="rotLabel" style="font-size:11px;color:#888;min-width:36px">0°</span>
+        <button class="rot-btn" onclick="rotateSelected(0,true)" style="color:#E24B4A">Reset</button>
+      </div>
+
+      <div>
+        <div class="sec-title" style="margin-bottom:4px">Miejsca — kliknij aby przypisać / odpiąć</div>
+        <div class="seat-panel" id="seatPanel"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Guest picker overlay -->
+<div id="guestPickerOverlay">
+  <div style="font-size:12px;font-weight:500;margin-bottom:6px">
+    Przypisz do krzesła <span id="pickerSeatLabel" style="color:#888"></span>
+  </div>
+  <input class="search-box" id="pickerSearch" placeholder="Szukaj..." oninput="renderPicker()" style="margin-bottom:6px">
+  <div id="pickerList" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:2px"></div>
+  <button class="btn btn-sm" style="margin-top:6px" onclick="closeGuestPicker()">Anuluj</button>
+</div>
+
+<style>
+  .picker-item {
+    padding: 5px 7px; border-radius: 6px; cursor: pointer;
+    display: flex; gap: 6px; align-items: center; font-size: 12px;
+  }
+  .picker-item:hover { background: var(--color-bg-secondary); }
+</style>
+
+<script src="js/app.js"></script>
+</body>
+</html>
