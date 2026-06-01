@@ -130,15 +130,14 @@
       <div class="row"><label>Imię</label><input type="text" id="manualName" placeholder="Jan Kowalski"/></div>
       <div class="row">
         <label>Grupa</label>
-        <select id="manualGroup">
-          <option value="family">Rodzina</option>
-          <option value="friend">Przyjaciel</option>
-          <option value="work">Praca</option>
-          <option value="other">Inne</option>
-        </select>
+        <select id="manualGroup" class="group-select"></select>
       </div>
       <button class="btn btn-primary" onclick="addGuestManual()">+ Dodaj gościa</button>
       <button class="btn" onclick="clearGuests()">🗑 Usuń wszystkich gości</button>
+      <hr class="sep">
+      <div class="sec-title">Kategorie</div>
+      <div id="categoryListPanel"></div>
+      <button class="btn" onclick="addCategory()">+ Dodaj kategorię</button>
     </div>
 
     <!-- TAB: Import -->

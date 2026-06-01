@@ -396,3 +396,35 @@ canvas         { display: block; }
 
 /* ── CSV mapping box ──────────────────────────────────────────── */
 #csvMappingBox { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── Category list ────────────────────────────────────────────── */
+#categoryListPanel { display: flex; flex-direction: column; gap: 3px; }
+
+.cat-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cat-color-input {
+  width: 22px;
+  height: 22px;
+  border: 0.5px solid var(--color-border-primary);
+  border-radius: 4px;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cat-name-input {
+  flex: 1;
+  font-size: 12px;
+  padding: 4px 7px;
+  border: 0.5px solid var(--color-border-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  min-width: 0;
+}
+.cat-name-input:focus { outline: none; box-shadow: 0 0 0 2px #85B7EB44; border-color: var(--color-accent); }

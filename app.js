@@ -1,6 +1,6 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CHAIR_GAP = 5;
-const GROUP_COLORS = {
+let groupColors = {
   family: { bg: '#EAF3DE', text: '#27500A', label: 'Rodzina' },
   friend: { bg: '#EEEDFE', text: '#26215C', label: 'Przyjaciel' },
   work:   { bg: '#FAEEDA', text: '#412402', label: 'Praca' },
@@ -25,6 +25,7 @@ let pendingRawRows = [];
 let selectedType = 'circle_180';
 let pickerTableIdx = null, pickerSeatIdx = null;
 let editingGuestId = null;
+let nextCatId = 1;
 
 // ── Canvas setup ───────────────────────────────────────────────────────────────
 const canvas = document.getElementById('floorCanvas');
@@ -192,8 +193,9 @@ function clearGuests() {
 function cycleGroup(gid) {
   const g = guests.find(x => x.id === gid);
   if (!g) return;
-  const order = ['family', 'friend', 'work', 'other'];
-  g.group = order[(order.indexOf(g.group) + 1) % order.length];
+  const order = Object.keys(groupColors);
+  const cur = order.indexOf(g.group);
+  g.group = order[(cur < 0 ? 0 : cur + 1) % order.length];
   renderGuestList(); draw();
 }
 
@@ -253,7 +255,7 @@ function renderPicker() {
   const list = document.getElementById('pickerList');
   if (!avail.length) { list.innerHTML = '<div style="font-size:12px;color:#888;padding:4px">Brak dostępnych gości</div>'; return; }
   list.innerHTML = avail.map(g => {
-    const gc = GROUP_COLORS[g.group] || GROUP_COLORS.other;
+    const gc = groupColors[g.group] || groupColors.other || Object.values(groupColors)[0];
     return `<div class="picker-item" onclick="assignGuestToSeat(${g.id})">
       <span class="gtag" style="background:${gc.bg};color:${gc.text}">${gc.label}</span>
       <span>${g.name}</span>
@@ -316,7 +318,7 @@ function renderGuestList() {
     return;
   }
   panel.innerHTML = list.map(g => {
-    const gc = GROUP_COLORS[g.group] || GROUP_COLORS.other;
+    const gc = groupColors[g.group] || groupColors.other || Object.values(groupColors)[0];
     const tbl = g.tableId != null ? tables.find(t => t.id === g.tableId) : null;
     const seatNum = tbl ? tbl.seatGuests.indexOf(g.id) + 1 : null;
     const isEditing = editingGuestId === g.id;
@@ -358,7 +360,7 @@ function renderSeatPanel() {
   document.getElementById('seatPanel').innerHTML = Array.from({ length: t.seats }, (_, i) => {
     const gid = t.seatGuests[i];
     const g   = gid ? guests.find(x => x.id === gid) : null;
-    const gc  = g ? (GROUP_COLORS[g.group] || GROUP_COLORS.other) : null;
+    const gc  = g ? (groupColors[g.group] || groupColors.other || Object.values(groupColors)[0]) : null;
     if (g) {
       const colorVal = g.chairColor || gc.bg;
       return `
@@ -455,7 +457,7 @@ function roundRect(c, x, y, w, h, r) {
 }
 
 function drawChair(cx, cy, r, g) {
-  const gc = g ? (GROUP_COLORS[g.group] || GROUP_COLORS.other) : null;
+  const gc = g ? (groupColors[g.group] || groupColors.other || Object.values(groupColors)[0]) : null;
   const bg = g ? (g.chairColor || gc.bg) : '#e8e6de';
   const bd = g ? darken(g.chairColor || gc.bg) : '#c0beb5';
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -780,13 +782,7 @@ function confirmImport() {
     let name = c[fi] || '';
     if (li >= 0 && c[li]) name = (name + ' ' + c[li]).trim();
     if (!name || guests.find(g => g.name === name)) return;
-    let group = 'other';
-    if (gi >= 0) {
-      const rg = (c[gi] || '').toLowerCase();
-      if (['family','rodzina'].some(x => rg.includes(x)))             group = 'family';
-      else if (['friend','przyjaciel','znajom'].some(x => rg.includes(x))) group = 'friend';
-      else if (['work','praca'].some(x => rg.includes(x)))            group = 'work';
-    }
+    const group = resolveGroup(gi >= 0 ? (c[gi] || '') : '');
     const g = { id: nextGId++, name, group, tableId: null, chairColor: null };
     guests.push(g); imported++;
     const tableName = ti >= 0 ? (c[ti] || '') : '';
@@ -813,6 +809,78 @@ function confirmImport() {
 
 function loadExample() {
   processCSVText(`imie,nazwisko,grupa,stol\nAnna,Kowalska,family,Rodzina\nPiotr,Nowak,family,Rodzina\nMarta,Wiśniewska,friend,Przyjaciele\nTomasz,Zając,friend,`, 'przykład.csv');
+}
+
+// ── Category management ────────────────────────────────────────────────────────
+function textForBg(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return (0.299*r + 0.587*g + 0.114*b) > 140 ? '#2C2C2A' : '#f5f4f0';
+}
+
+function resolveGroup(raw) {
+  const rv = (raw || '').toLowerCase().trim();
+  if (!rv) return groupColors.other ? 'other' : Object.keys(groupColors)[0];
+  for (const [key, gc] of Object.entries(groupColors)) {
+    if (gc.label.toLowerCase() === rv) return key;
+  }
+  if (groupColors.family && ['family','rodzina'].some(x => rv.includes(x))) return 'family';
+  if (groupColors.friend && ['friend','przyjaciel','znajom'].some(x => rv.includes(x))) return 'friend';
+  if (groupColors.work   && ['work','praca'].some(x => rv.includes(x))) return 'work';
+  return groupColors.other ? 'other' : Object.keys(groupColors)[0];
+}
+
+function renderCategoryList() {
+  const panel = document.getElementById('categoryListPanel');
+  if (!panel) return;
+  const keys = Object.keys(groupColors);
+  panel.innerHTML = Object.entries(groupColors).map(([key, gc]) => `
+    <div class="cat-row">
+      <input type="color" class="cat-color-input" value="${gc.bg}"
+             oninput="setCategoryColor('${key}', this.value)">
+      <input type="text" class="cat-name-input" value="${gc.label}"
+             onchange="renameCategory('${key}', this.value)"
+             onblur="renameCategory('${key}', this.value)">
+      <button class="x-btn" onclick="deleteCategory('${key}')"
+              ${keys.length <= 1 ? 'disabled style="opacity:.35;cursor:default"' : ''}>×</button>
+    </div>`).join('');
+}
+
+function refreshGroupSelects() {
+  const opts = Object.entries(groupColors).map(([k, gc]) => `<option value="${k}">${gc.label}</option>`).join('');
+  document.querySelectorAll('.group-select').forEach(sel => {
+    const cur = sel.value;
+    sel.innerHTML = opts;
+    if (groupColors[cur]) sel.value = cur;
+  });
+}
+
+function addCategory() {
+  const palette = ['#FADADD','#D4F0FF','#D4F5D4','#FFF0D4','#E8D4FF','#FFD4F0','#D4EFEF'];
+  const bg = palette[Object.keys(groupColors).length % palette.length];
+  const key = 'cat_' + (nextCatId++);
+  groupColors[key] = { bg, text: textForBg(bg), label: 'Kategoria ' + Object.keys(groupColors).length };
+  renderCategoryList(); refreshGroupSelects();
+}
+
+function deleteCategory(key) {
+  if (Object.keys(groupColors).length <= 1) return;
+  const fallback = Object.keys(groupColors).find(k => k !== key);
+  guests.forEach(g => { if (g.group === key) g.group = fallback; });
+  delete groupColors[key];
+  renderCategoryList(); refreshGroupSelects(); renderGuestList(); draw();
+}
+
+function setCategoryColor(key, hex) {
+  if (!groupColors[key]) return;
+  groupColors[key].bg = hex;
+  groupColors[key].text = textForBg(hex);
+  renderGuestList(); draw();
+}
+
+function renameCategory(key, label) {
+  if (!groupColors[key] || !label.trim()) return;
+  groupColors[key].label = label.trim();
+  refreshGroupSelects(); renderGuestList();
 }
 
 // ── Export ─────────────────────────────────────────────────────────────────────
@@ -861,3 +929,5 @@ resizeCanvas();
 renderSidebar();
 renderGuestList();
 updateStats();
+renderCategoryList();
+refreshGroupSelects();
