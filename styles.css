@@ -393,3 +393,6 @@ canvas         { display: block; }
 
 /* ── Custom dims ──────────────────────────────────────────────── */
 #customDims { display: none; flex-direction: column; gap: 5px; }
+
+/* ── CSV mapping box ──────────────────────────────────────────── */
+#csvMappingBox { display: flex; flex-direction: column; gap: 6px; }

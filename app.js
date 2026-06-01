@@ -20,7 +20,8 @@ let dragging = false, dragOffX = 0, dragOffY = 0;
 let rotating = false, rotStartAngle = 0, rotStartRot = 0;
 let dragSeatFrom = null;
 let roomW = 1200, roomH = 800;
-let pendingImport = null;
+let pendingHeaders = [];
+let pendingRawRows = [];
 let selectedType = 'circle_180';
 let pickerTableIdx = null, pickerSeatIdx = null;
 let editingGuestId = null;
@@ -693,35 +694,6 @@ document.addEventListener('keydown', e => {
 });
 
 // ── CSV import ─────────────────────────────────────────────────────────────────
-function parseCSV(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return { error: 'Za krótki plik.' };
-  const sep = lines[0].includes(';') ? ';' : ',';
-  const hdr = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/["']/g, ''));
-  const cm = {};
-  ['imie','imię','firstname','name'].forEach(k => { const i = hdr.indexOf(k); if (i >= 0 && cm.first === undefined) cm.first = i; });
-  ['nazwisko','last_name','lastname','surname'].forEach(k => { const i = hdr.indexOf(k); if (i >= 0 && cm.last === undefined) cm.last = i; });
-  ['imie_nazwisko','full_name','fullname'].forEach(k => { const i = hdr.indexOf(k); if (i >= 0 && cm.full === undefined) cm.full = i; });
-  ['grupa','group','kategoria'].forEach(k => { const i = hdr.indexOf(k); if (i >= 0 && cm.group === undefined) cm.group = i; });
-  ['stol','stół','table'].forEach(k => { const i = hdr.indexOf(k); if (i >= 0 && cm.table === undefined) cm.table = i; });
-  const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const ln = lines[i].trim(); if (!ln) continue;
-    const c = ln.split(sep).map(x => x.trim().replace(/^["']|["']$/g, ''));
-    let name = '';
-    if (cm.full !== undefined) name = c[cm.full] || '';
-    else { const f = cm.first !== undefined ? c[cm.first] || '' : ''; const l = cm.last !== undefined ? c[cm.last] || '' : ''; name = (f + ' ' + l).trim(); }
-    if (!name) continue;
-    const rg = (cm.group !== undefined ? c[cm.group] || '' : '').toLowerCase();
-    let group = 'other';
-    if (['family','rodzina'].some(x => rg.includes(x)))   group = 'family';
-    else if (['friend','przyjaciel','znajom'].some(x => rg.includes(x))) group = 'friend';
-    else if (['work','praca'].some(x => rg.includes(x)))  group = 'work';
-    rows.push({ name, group, tableName: cm.table !== undefined ? c[cm.table] || '' : '' });
-  }
-  return { rows, count: rows.length };
-}
-
 function handleFileSelect(e) {
   const f = e.target.files[0]; if (!f) return;
   const fr = new FileReader(); fr.onload = ev => processCSVText(ev.target.result, f.name); fr.readAsText(f, 'UTF-8');
@@ -737,43 +709,105 @@ dz.addEventListener('drop', e => {
 });
 
 function processCSVText(text, fname) {
-  const res = parseCSV(text);
-  const se = document.getElementById('csvStatus'), pb = document.getElementById('csvPreviewBox'), ib = document.getElementById('importBtn');
-  if (res.error) {
-    se.style.display = 'block';
-    se.innerHTML = `<div style="font-size:12px;color:#A32D2D;padding:6px 8px;background:#FCEBEB;border-radius:6px">${res.error}</div>`;
-    pb.style.display = 'none'; ib.style.display = 'none'; pendingImport = null; return;
+  const se = document.getElementById('csvStatus');
+  const mb = document.getElementById('csvMappingBox');
+  const pb = document.getElementById('csvPreviewBox');
+  const ib = document.getElementById('importBtn');
+  const lines = text.trim().split(/\r?\n/);
+  const err = s => { se.style.display = 'block'; se.innerHTML = `<div style="font-size:12px;color:#A32D2D;padding:6px 8px;background:#FCEBEB;border-radius:6px">${s}</div>`; mb.style.display = 'none'; pb.style.display = 'none'; ib.style.display = 'none'; pendingHeaders = []; pendingRawRows = []; };
+  if (lines.length < 2) { err('Za krótki plik.'); return; }
+  const sep = lines[0].includes(';') ? ';' : ',';
+  pendingHeaders = lines[0].split(sep).map(h => h.trim().replace(/^["']|["']$/g, ''));
+  if (!pendingHeaders.length) { err('Nie znaleziono nagłówków.'); return; }
+  pendingRawRows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const ln = lines[i].trim(); if (!ln) continue;
+    pendingRawRows.push(ln.split(sep).map(x => x.trim().replace(/^["']|["']$/g, '')));
   }
-  pendingImport = res.rows; se.style.display = 'block';
-  se.innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">Znaleziono <strong>${res.count}</strong> gości — "${fname}"</div>`;
-  pb.style.display = 'block';
-  document.getElementById('csvPreview').textContent = res.rows.slice(0, 6).map(r => `${r.name} | ${r.group} | ${r.tableName || '—'}`).join('\n') + (res.rows.length > 6 ? '\n…+' + (res.rows.length - 6) : '');
+  se.style.display = 'block';
+  se.innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">Wczytano <strong>"${fname}"</strong> — ${pendingRawRows.length} wierszy, ${pendingHeaders.length} kolumn</div>`;
+  mb.style.display = 'block';
+  renderColumnPicker();
+  applyMapping();
   ib.style.display = 'flex';
 }
 
+function renderColumnPicker() {
+  const hdr = pendingHeaders.map(h => h.toLowerCase());
+  const find = keys => { for (const k of keys) { const i = hdr.indexOf(k); if (i >= 0) return i; } return -1; };
+  const dFirst = Math.max(0, find(['imie','imię','firstname','name','imie_nazwisko','full_name','fullname']));
+  const dLast  = find(['nazwisko','last_name','lastname','surname']);
+  const dGroup = find(['grupa','group','kategoria']);
+  const dTable = find(['stol','stół','table']);
+  const colOpts = (def, withNone) =>
+    (withNone ? `<option value="-1"${def === -1 ? ' selected' : ''}>— brak —</option>` : '') +
+    pendingHeaders.map((h, i) => `<option value="${i}"${i === def ? ' selected' : ''}>${h}</option>`).join('');
+  document.getElementById('csvMappingBox').innerHTML = `
+    <div class="sec-title" style="margin-top:2px">Mapowanie kolumn</div>
+    <div class="row"><label>Imię / nazwa</label><select id="mapFirst" onchange="applyMapping()">${colOpts(dFirst, false)}</select></div>
+    <div class="row"><label>Nazwisko</label><select id="mapLast" onchange="applyMapping()">${colOpts(dLast, true)}</select></div>
+    <div class="row"><label>Kategoria</label><select id="mapGroup" onchange="applyMapping()">${colOpts(dGroup, true)}</select></div>
+    <div class="row"><label>Stół</label><select id="mapTable" onchange="applyMapping()">${colOpts(dTable, true)}</select></div>`;
+}
+
+function applyMapping() {
+  if (!pendingRawRows.length) return;
+  const fi = +document.getElementById('mapFirst').value;
+  const li = +document.getElementById('mapLast').value;
+  const gi = +document.getElementById('mapGroup').value;
+  const ti = +document.getElementById('mapTable').value;
+  const rows = pendingRawRows.slice(0, 6).map(c => {
+    let name = c[fi] || '';
+    if (li >= 0 && c[li]) name = (name + ' ' + c[li]).trim();
+    const group = gi >= 0 ? (c[gi] || '—') : '—';
+    const table = ti >= 0 ? (c[ti] || '—') : '—';
+    return `${name || '(brak)'} | ${group} | ${table}`;
+  });
+  const pb = document.getElementById('csvPreviewBox');
+  pb.style.display = 'block';
+  document.getElementById('csvPreview').textContent = rows.join('\n') + (pendingRawRows.length > 6 ? '\n…+' + (pendingRawRows.length - 6) + ' więcej' : '');
+}
+
 function confirmImport() {
-  if (!pendingImport) return;
+  if (!pendingRawRows.length) return;
+  const fi = +document.getElementById('mapFirst').value;
+  const li = +document.getElementById('mapLast').value;
+  const gi = +document.getElementById('mapGroup').value;
+  const ti = +document.getElementById('mapTable').value;
   const autoT = {};
-  pendingImport.forEach(row => {
-    if (guests.find(g => g.name === row.name)) return;
-    const g = { id: nextGId++, name: row.name, group: row.group, tableId: null, chairColor: null };
-    guests.push(g);
-    if (row.tableName) {
-      let t = tables.find(x => x.name.toLowerCase() === row.tableName.toLowerCase());
+  let imported = 0;
+  pendingRawRows.forEach(c => {
+    let name = c[fi] || '';
+    if (li >= 0 && c[li]) name = (name + ' ' + c[li]).trim();
+    if (!name || guests.find(g => g.name === name)) return;
+    let group = 'other';
+    if (gi >= 0) {
+      const rg = (c[gi] || '').toLowerCase();
+      if (['family','rodzina'].some(x => rg.includes(x)))             group = 'family';
+      else if (['friend','przyjaciel','znajom'].some(x => rg.includes(x))) group = 'friend';
+      else if (['work','praca'].some(x => rg.includes(x)))            group = 'work';
+    }
+    const g = { id: nextGId++, name, group, tableId: null, chairColor: null };
+    guests.push(g); imported++;
+    const tableName = ti >= 0 ? (c[ti] || '') : '';
+    if (tableName) {
+      let t = tables.find(x => x.name.toLowerCase() === tableName.toLowerCase());
       if (!t) {
-        if (!autoT[row.tableName]) {
-          t = { id: nextTId++, name: row.tableName, shape: 'circle', wCm: 180, hCm: 180, seats: 10, color: newColor, angle: 0, x: roomW/2 + (Math.random()-0.5)*400, y: roomH/2 + (Math.random()-0.5)*250, seatGuests: Array(10).fill(null) };
-          tables.push(t); autoT[row.tableName] = t;
-        } else t = autoT[row.tableName];
+        if (!autoT[tableName]) {
+          t = { id: nextTId++, name: tableName, shape: 'circle', wCm: 180, hCm: 180, seats: 10, color: newColor, angle: 0, x: roomW/2 + (Math.random()-0.5)*400, y: roomH/2 + (Math.random()-0.5)*250, seatGuests: Array(10).fill(null) };
+          tables.push(t); autoT[tableName] = t;
+        } else t = autoT[tableName];
       }
       ensureSeatArray(t);
       const si = t.seatGuests.indexOf(null);
       if (si >= 0) { t.seatGuests[si] = g.id; g.tableId = t.id; }
     }
   });
-  pendingImport = null;
+  pendingRawRows = []; pendingHeaders = [];
   document.getElementById('importBtn').style.display = 'none';
-  document.getElementById('csvStatus').innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">Import zakończony!</div>`;
+  document.getElementById('csvMappingBox').style.display = 'none';
+  document.getElementById('csvPreviewBox').style.display = 'none';
+  document.getElementById('csvStatus').innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">Import zakończony! Dodano <strong>${imported}</strong> gości.</div>`;
   renderSidebar(); renderGuestList(); draw(); updateStats(); switchTab('goscie');
 }
 
