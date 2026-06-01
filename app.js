@@ -781,6 +781,42 @@ function loadExample() {
   processCSVText(`imie,nazwisko,grupa,stol\nAnna,Kowalska,family,Rodzina\nPiotr,Nowak,family,Rodzina\nMarta,Wiśniewska,friend,Przyjaciele\nTomasz,Zając,friend,`, 'przykład.csv');
 }
 
+// ── Export ─────────────────────────────────────────────────────────────────────
+function getExportCanvas() {
+  const tmp = document.createElement('canvas');
+  tmp.width = canvas.width; tmp.height = canvas.height;
+  const tc = tmp.getContext('2d');
+  tc.fillStyle = '#f7f7f5';
+  tc.fillRect(0, 0, tmp.width, tmp.height);
+  tc.drawImage(canvas, 0, 0);
+  return tmp;
+}
+
+function exportJPG() {
+  const tmp = getExportCanvas();
+  const a = document.createElement('a');
+  a.download = 'tableplaner.jpg';
+  a.href = tmp.toDataURL('image/jpeg', 0.95);
+  a.click();
+}
+
+function exportPDF() {
+  if (!window.jspdf) { alert('Biblioteka jsPDF nie jest załadowana. Sprawdź połączenie z internetem.'); return; }
+  const { jsPDF } = window.jspdf;
+  const tmp = getExportCanvas();
+  const cw = tmp.width, ch = tmp.height;
+  const isLandscape = cw >= ch;
+  const pageW = isLandscape ? 297 : 210, pageH = isLandscape ? 210 : 297;
+  const margin = 10;
+  const availW = pageW - margin * 2, availH = pageH - margin * 2;
+  const scale = Math.min(availW / cw, availH / ch);
+  const imgW = cw * scale, imgH = ch * scale;
+  const x = margin + (availW - imgW) / 2, y = margin + (availH - imgH) / 2;
+  const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+  pdf.addImage(tmp.toDataURL('image/jpeg', 0.95), 'JPEG', x, y, imgW, imgH);
+  pdf.save('tableplaner.pdf');
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────────
 tables.push({ id: nextTId++, name: 'Młodzi',    shape: 'rect',   wCm: 160, hCm: 90,  seats: 2,  color: '#85B7EB', angle: 0,  x: 820, y: 180, seatGuests: [null, null] });
 tables.push({ id: nextTId++, name: 'Rodzina A', shape: 'circle', wCm: 180, hCm: 180, seats: 10, color: '#5DCAA5', angle: 0,  x: 350, y: 540, seatGuests: Array(10).fill(null) });

@@ -175,7 +175,9 @@ Piotr,Nowak,family,</div>
       <span id="zoomVal" style="font-weight:500;color:var(--color-text-primary)">60%</span>
       <span>|</span>
       <span id="roomDimLabel">1200×800 cm</span>
-      <span style="margin-left:auto;font-size:11px">Przeciągnij · kliknij aby zaznaczyć · ← → obracaj</span>
+      <span style="font-size:11px">Przeciągnij · kliknij aby zaznaczyć · ← → obracaj</span>
+      <button class="btn btn-sm" style="margin-left:auto" onclick="exportJPG()" title="Eksportuj jako JPG">↓ JPG</button>
+      <button class="btn btn-sm" onclick="exportPDF()" title="Eksportuj jako PDF">↓ PDF</button>
     </div>
 
     <div class="canvas-scroll" id="canvasScroll">
@@ -242,6 +244,7 @@ Piotr,Nowak,family,</div>
   .picker-item:hover { background: var(--color-bg-secondary); }
 </style>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
