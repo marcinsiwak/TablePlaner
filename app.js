@@ -461,11 +461,25 @@ function drawChair(cx, cy, r, g) {
   ctx.fillStyle = bg; ctx.fill();
   ctx.strokeStyle = bd; ctx.lineWidth = 0.5; ctx.stroke();
   if (g && zoom > 0.45) {
-    const fs = Math.max(6, 7 * zoom);
-    ctx.font = `${fs}px sans-serif`;
     ctx.fillStyle = g.chairColor ? darken(g.chairColor) : gc.text;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(g.name.split(' ')[0].substring(0, 7), cx, cy);
+    const parts = g.name.trim().split(/\s+/);
+    const line1 = parts[0];
+    const line2 = parts.length > 1 ? parts.slice(1).join(' ') : null;
+    const maxW = r * 1.7;
+    let fs = Math.max(5, 7 * zoom);
+    ctx.font = `${fs}px sans-serif`;
+    const measure = () => line2
+      ? Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width)
+      : ctx.measureText(line1).width;
+    while (fs > 4 && measure() > maxW) { fs -= 0.5; ctx.font = `${fs}px sans-serif`; }
+    if (line2) {
+      const lh = fs * 1.2;
+      ctx.fillText(line1, cx, cy - lh * 0.5);
+      ctx.fillText(line2, cx, cy + lh * 0.5);
+    } else {
+      ctx.fillText(line1, cx, cy);
+    }
   } else {
     ctx.fillStyle = '#999'; ctx.font = `${Math.max(6, 7*zoom)}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
