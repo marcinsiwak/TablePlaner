@@ -18,6 +18,7 @@ let nextGId = 1;
 let newColor = '#5DCAA5';
 let dragging = false, dragOffX = 0, dragOffY = 0;
 let rotating = false, rotStartAngle = 0, rotStartRot = 0;
+let dragSeatFrom = null;
 let roomW = 1200, roomH = 800;
 let pendingImport = null;
 let selectedType = 'circle_180';
@@ -176,7 +177,7 @@ function rotateSelected(deg, reset = false) {
 function addGuestManual() {
   const name = document.getElementById('manualName').value.trim();
   if (!name) return;
-  guests.push({ id: nextGId++, name, group: document.getElementById('manualGroup').value, tableId: null });
+  guests.push({ id: nextGId++, name, group: document.getElementById('manualGroup').value, tableId: null, chairColor: null });
   document.getElementById('manualName').value = '';
   renderGuestList(); updateStats();
 }
@@ -357,20 +358,63 @@ function renderSeatPanel() {
     const gid = t.seatGuests[i];
     const g   = gid ? guests.find(x => x.id === gid) : null;
     const gc  = g ? (GROUP_COLORS[g.group] || GROUP_COLORS.other) : null;
-    if (g) return `
-      <div class="seat-row occupied">
-        <span class="seat-num">${i + 1}</span>
-        <span class="gtag" style="background:${gc.bg};color:${gc.text}">${gc.label}</span>
-        <span class="seat-name">${g.name}</span>
-        <button class="x-btn" onclick="unassignSeat(${i})">×</button>
-      </div>`;
+    if (g) {
+      const colorVal = g.chairColor || gc.bg;
+      return `
+        <div class="seat-row occupied" draggable="true"
+             ondragstart="seatDragStart(${i})"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="seatDrop(${i});this.classList.remove('drag-over')"
+             ondragend="seatDragEnd()">
+          <span class="drag-handle" title="Przeciągnij aby zmienić kolejność">⠿</span>
+          <span class="seat-num">${i + 1}</span>
+          <span class="gtag" style="background:${gc.bg};color:${gc.text}">${gc.label}</span>
+          <span class="seat-name">${g.name}</span>
+          <input type="color" class="chair-color-input" value="${colorVal}"
+                 onchange="setChairColor(${g.id}, this.value)" title="Kolor krzesła">
+          <button class="x-btn" onclick="unassignSeat(${i})">×</button>
+        </div>`;
+    }
     return `
-      <div class="seat-row empty" onclick="openGuestPicker(${i})">
+      <div class="seat-row empty"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="seatDrop(${i});this.classList.remove('drag-over')"
+           onclick="openGuestPicker(${i})">
         <span class="seat-num">${i + 1}</span>
         <span class="seat-empty">wolne — kliknij aby przypisać</span>
         <span style="font-size:13px;color:#aaa">+</span>
       </div>`;
   }).join('');
+}
+
+function setChairColor(gid, color) {
+  const g = guests.find(x => x.id === gid);
+  if (!g) return;
+  g.chairColor = color;
+  draw();
+}
+
+function seatDragStart(idx) {
+  dragSeatFrom = idx;
+}
+
+function seatDragOver(e) {
+  e.preventDefault();
+}
+
+function seatDrop(idx) {
+  if (dragSeatFrom === null || dragSeatFrom === idx || selected === null) return;
+  const t = tables[selected]; ensureSeatArray(t);
+  [t.seatGuests[dragSeatFrom], t.seatGuests[idx]] = [t.seatGuests[idx], t.seatGuests[dragSeatFrom]];
+  dragSeatFrom = null;
+  renderSeatPanel(); draw();
+}
+
+function seatDragEnd() {
+  dragSeatFrom = null;
+  document.querySelectorAll('.seat-row.drag-over').forEach(el => el.classList.remove('drag-over'));
 }
 
 function updateProp() {
@@ -410,15 +454,16 @@ function roundRect(c, x, y, w, h, r) {
 }
 
 function drawChair(cx, cy, r, g) {
+  const gc = g ? (GROUP_COLORS[g.group] || GROUP_COLORS.other) : null;
+  const bg = g ? (g.chairColor || gc.bg) : '#e8e6de';
+  const bd = g ? darken(g.chairColor || gc.bg) : '#c0beb5';
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = g ? (GROUP_COLORS[g.group] || GROUP_COLORS.other).bg : '#e8e6de';
-  ctx.fill();
-  ctx.strokeStyle = g ? darken((GROUP_COLORS[g.group] || GROUP_COLORS.other).bg) : '#c0beb5';
-  ctx.lineWidth = 0.5; ctx.stroke();
+  ctx.fillStyle = bg; ctx.fill();
+  ctx.strokeStyle = bd; ctx.lineWidth = 0.5; ctx.stroke();
   if (g && zoom > 0.45) {
     const fs = Math.max(6, 7 * zoom);
     ctx.font = `${fs}px sans-serif`;
-    ctx.fillStyle = darken((GROUP_COLORS[g.group] || GROUP_COLORS.other).bg);
+    ctx.fillStyle = g.chairColor ? darken(g.chairColor) : gc.text;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillText(g.name.split(' ')[0].substring(0, 7), cx, cy);
   } else {
@@ -697,7 +742,7 @@ function confirmImport() {
   const autoT = {};
   pendingImport.forEach(row => {
     if (guests.find(g => g.name === row.name)) return;
-    const g = { id: nextGId++, name: row.name, group: row.group, tableId: null };
+    const g = { id: nextGId++, name: row.name, group: row.group, tableId: null, chairColor: null };
     guests.push(g);
     if (row.tableName) {
       let t = tables.find(x => x.name.toLowerCase() === row.tableName.toLowerCase());

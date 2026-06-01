@@ -201,6 +201,31 @@ input:focus, select:focus { outline: none; box-shadow: 0 0 0 2px #85B7EB44; bord
 .seat-name  { flex: 1; }
 .seat-empty { flex: 1; color: var(--color-text-secondary); font-style: italic; }
 
+.drag-handle {
+  font-size: 13px;
+  color: var(--color-border-secondary);
+  cursor: grab;
+  flex-shrink: 0;
+  user-select: none;
+  line-height: 1;
+}
+.drag-handle:active { cursor: grabbing; }
+
+.seat-row.drag-over {
+  border-color: var(--color-accent);
+  background: #E6F1FB;
+}
+
+.chair-color-input {
+  width: 18px;
+  height: 18px;
+  border: 0.5px solid var(--color-border-primary);
+  border-radius: 4px;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
 /* ── Canvas area ──────────────────────────────────────────────── */
 .canvas-wrap { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
 
