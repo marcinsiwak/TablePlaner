@@ -181,7 +181,7 @@ function addGuestManual() {
   if (!name) return;
   guests.push({ id: nextGId++, name, group: document.getElementById('manualGroup').value, tableId: null, chairColor: null });
   document.getElementById('manualName').value = '';
-  renderGuestList(); updateStats();
+  renderGuestList(); updateStats(); triggerAutoSave();
 }
 
 function clearGuests() {
@@ -860,7 +860,7 @@ function addCategory() {
   const bg = palette[Object.keys(groupColors).length % palette.length];
   const key = 'cat_' + (nextCatId++);
   groupColors[key] = { bg, text: textForBg(bg), label: 'Kategoria ' + Object.keys(groupColors).length };
-  renderCategoryList(); refreshGroupSelects();
+  renderCategoryList(); refreshGroupSelects(); triggerAutoSave();
 }
 
 function deleteCategory(key) {
@@ -979,7 +979,7 @@ function triggerAutoSave() {
     }
     const el = document.getElementById('autoSaveStatus');
     if (el) { const n = new Date(); el.textContent = 'Zapisano ' + n.getHours().toString().padStart(2,'0') + ':' + n.getMinutes().toString().padStart(2,'0'); }
-  }, 1500);
+  }, 0);
 }
 
 function renderSessionList() {
@@ -1028,7 +1028,7 @@ function deleteSession(id) {
 function renameSession(id, name) {
   if (!name.trim()) return;
   const idx = getIndex(); const e = idx.find(x => x.id === id);
-  if (e) { e.name = name.trim(); saveIndex(idx); }
+  if (e) { e.name = name.trim(); saveIndex(idx); triggerAutoSave(); }
 }
 
 function startNewSession(name, withExamples) {
