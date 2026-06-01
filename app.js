@@ -1,6 +1,6 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CHAIR_GAP = 5;
-const GROUP_COLORS = {
+let groupColors = {
   family: { bg: '#EAF3DE', text: '#27500A', label: 'Rodzina' },
   friend: { bg: '#EEEDFE', text: '#26215C', label: 'Przyjaciel' },
   work:   { bg: '#FAEEDA', text: '#412402', label: 'Praca' },
@@ -18,11 +18,14 @@ let nextGId = 1;
 let newColor = '#5DCAA5';
 let dragging = false, dragOffX = 0, dragOffY = 0;
 let rotating = false, rotStartAngle = 0, rotStartRot = 0;
+let dragSeatFrom = null;
 let roomW = 1200, roomH = 800;
-let pendingImport = null;
+let pendingHeaders = [];
+let pendingRawRows = [];
 let selectedType = 'circle_180';
 let pickerTableIdx = null, pickerSeatIdx = null;
 let editingGuestId = null;
+let nextCatId = 1;
 
 // ── Canvas setup ───────────────────────────────────────────────────────────────
 const canvas = document.getElementById('floorCanvas');
@@ -176,9 +179,9 @@ function rotateSelected(deg, reset = false) {
 function addGuestManual() {
   const name = document.getElementById('manualName').value.trim();
   if (!name) return;
-  guests.push({ id: nextGId++, name, group: document.getElementById('manualGroup').value, tableId: null });
+  guests.push({ id: nextGId++, name, group: document.getElementById('manualGroup').value, tableId: null, chairColor: null });
   document.getElementById('manualName').value = '';
-  renderGuestList(); updateStats();
+  renderGuestList(); updateStats(); triggerAutoSave();
 }
 
 function clearGuests() {
@@ -190,8 +193,9 @@ function clearGuests() {
 function cycleGroup(gid) {
   const g = guests.find(x => x.id === gid);
   if (!g) return;
-  const order = ['family', 'friend', 'work', 'other'];
-  g.group = order[(order.indexOf(g.group) + 1) % order.length];
+  const order = Object.keys(groupColors);
+  const cur = order.indexOf(g.group);
+  g.group = order[(cur < 0 ? 0 : cur + 1) % order.length];
   renderGuestList(); draw();
 }
 
@@ -251,7 +255,7 @@ function renderPicker() {
   const list = document.getElementById('pickerList');
   if (!avail.length) { list.innerHTML = '<div style="font-size:12px;color:#888;padding:4px">Brak dostępnych gości</div>'; return; }
   list.innerHTML = avail.map(g => {
-    const gc = GROUP_COLORS[g.group] || GROUP_COLORS.other;
+    const gc = groupColors[g.group] || groupColors.other || Object.values(groupColors)[0];
     return `<div class="picker-item" onclick="assignGuestToSeat(${g.id})">
       <span class="gtag" style="background:${gc.bg};color:${gc.text}">${gc.label}</span>
       <span>${g.name}</span>
@@ -314,7 +318,7 @@ function renderGuestList() {
     return;
   }
   panel.innerHTML = list.map(g => {
-    const gc = GROUP_COLORS[g.group] || GROUP_COLORS.other;
+    const gc = groupColors[g.group] || groupColors.other || Object.values(groupColors)[0];
     const tbl = g.tableId != null ? tables.find(t => t.id === g.tableId) : null;
     const seatNum = tbl ? tbl.seatGuests.indexOf(g.id) + 1 : null;
     const isEditing = editingGuestId === g.id;
@@ -356,21 +360,64 @@ function renderSeatPanel() {
   document.getElementById('seatPanel').innerHTML = Array.from({ length: t.seats }, (_, i) => {
     const gid = t.seatGuests[i];
     const g   = gid ? guests.find(x => x.id === gid) : null;
-    const gc  = g ? (GROUP_COLORS[g.group] || GROUP_COLORS.other) : null;
-    if (g) return `
-      <div class="seat-row occupied">
-        <span class="seat-num">${i + 1}</span>
-        <span class="gtag" style="background:${gc.bg};color:${gc.text}">${gc.label}</span>
-        <span class="seat-name">${g.name}</span>
-        <button class="x-btn" onclick="unassignSeat(${i})">×</button>
-      </div>`;
+    const gc  = g ? (groupColors[g.group] || groupColors.other || Object.values(groupColors)[0]) : null;
+    if (g) {
+      const colorVal = g.chairColor || gc.bg;
+      return `
+        <div class="seat-row occupied" draggable="true"
+             ondragstart="seatDragStart(${i})"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="seatDrop(${i});this.classList.remove('drag-over')"
+             ondragend="seatDragEnd()">
+          <span class="drag-handle" title="Przeciągnij aby zmienić kolejność">⠿</span>
+          <span class="seat-num">${i + 1}</span>
+          <span class="gtag" style="background:${gc.bg};color:${gc.text}">${gc.label}</span>
+          <span class="seat-name">${g.name}</span>
+          <input type="color" class="chair-color-input" value="${colorVal}"
+                 onchange="setChairColor(${g.id}, this.value)" title="Kolor krzesła">
+          <button class="x-btn" onclick="unassignSeat(${i})">×</button>
+        </div>`;
+    }
     return `
-      <div class="seat-row empty" onclick="openGuestPicker(${i})">
+      <div class="seat-row empty"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="seatDrop(${i});this.classList.remove('drag-over')"
+           onclick="openGuestPicker(${i})">
         <span class="seat-num">${i + 1}</span>
         <span class="seat-empty">wolne — kliknij aby przypisać</span>
         <span style="font-size:13px;color:#aaa">+</span>
       </div>`;
   }).join('');
+}
+
+function setChairColor(gid, color) {
+  const g = guests.find(x => x.id === gid);
+  if (!g) return;
+  g.chairColor = color;
+  draw();
+}
+
+function seatDragStart(idx) {
+  dragSeatFrom = idx;
+}
+
+function seatDragOver(e) {
+  e.preventDefault();
+}
+
+function seatDrop(idx) {
+  if (dragSeatFrom === null || dragSeatFrom === idx || selected === null) return;
+  const t = tables[selected]; ensureSeatArray(t);
+  [t.seatGuests[dragSeatFrom], t.seatGuests[idx]] = [t.seatGuests[idx], t.seatGuests[dragSeatFrom]];
+  dragSeatFrom = null;
+  renderSeatPanel(); draw();
+}
+
+function seatDragEnd() {
+  dragSeatFrom = null;
+  document.querySelectorAll('.seat-row.drag-over').forEach(el => el.classList.remove('drag-over'));
 }
 
 function updateProp() {
@@ -410,17 +457,32 @@ function roundRect(c, x, y, w, h, r) {
 }
 
 function drawChair(cx, cy, r, g) {
+  const gc = g ? (groupColors[g.group] || groupColors.other || Object.values(groupColors)[0]) : null;
+  const bg = g ? (g.chairColor || gc.bg) : '#e8e6de';
+  const bd = g ? darken(g.chairColor || gc.bg) : '#c0beb5';
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = g ? (GROUP_COLORS[g.group] || GROUP_COLORS.other).bg : '#e8e6de';
-  ctx.fill();
-  ctx.strokeStyle = g ? darken((GROUP_COLORS[g.group] || GROUP_COLORS.other).bg) : '#c0beb5';
-  ctx.lineWidth = 0.5; ctx.stroke();
+  ctx.fillStyle = bg; ctx.fill();
+  ctx.strokeStyle = bd; ctx.lineWidth = 0.5; ctx.stroke();
   if (g && zoom > 0.45) {
-    const fs = Math.max(6, 7 * zoom);
-    ctx.font = `${fs}px sans-serif`;
-    ctx.fillStyle = darken((GROUP_COLORS[g.group] || GROUP_COLORS.other).bg);
+    ctx.fillStyle = g.chairColor ? darken(g.chairColor) : gc.text;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(g.name.split(' ')[0].substring(0, 7), cx, cy);
+    const parts = g.name.trim().split(/\s+/);
+    const line1 = parts[0];
+    const line2 = parts.length > 1 ? parts.slice(1).join(' ') : null;
+    const maxW = r * 1.7;
+    let fs = Math.max(5, 7 * zoom);
+    ctx.font = `${fs}px sans-serif`;
+    const measure = () => line2
+      ? Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width)
+      : ctx.measureText(line1).width;
+    while (fs > 4 && measure() > maxW) { fs -= 0.5; ctx.font = `${fs}px sans-serif`; }
+    if (line2) {
+      const lh = fs * 1.2;
+      ctx.fillText(line1, cx, cy - lh * 0.5);
+      ctx.fillText(line2, cx, cy + lh * 0.5);
+    } else {
+      ctx.fillText(line1, cx, cy);
+    }
   } else {
     ctx.fillStyle = '#999'; ctx.font = `${Math.max(6, 7*zoom)}px sans-serif`;
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -525,6 +587,7 @@ function draw() {
     }
     ctx.restore();
   });
+  triggerAutoSave();
 }
 
 // ── Hit testing ────────────────────────────────────────────────────────────────
@@ -634,35 +697,6 @@ document.addEventListener('keydown', e => {
 });
 
 // ── CSV import ─────────────────────────────────────────────────────────────────
-function parseCSV(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return { error: 'Za krótki plik.' };
-  const sep = lines[0].includes(';') ? ';' : ',';
-  const hdr = lines[0].split(sep).map(h => h.trim().toLowerCase().replace(/["']/g, ''));
-  const cm = {};
-  ['imie','imię','firstname','name'].forEach(k => { const i = hdr.indexOf(k); if (i >= 0 && cm.first === undefined) cm.first = i; });
-  ['nazwisko','last_name','lastname','surname'].forEach(k => { const i = hdr.indexOf(k); if (i >= 0 && cm.last === undefined) cm.last = i; });
-  ['imie_nazwisko','full_name','fullname'].forEach(k => { const i = hdr.indexOf(k); if (i >= 0 && cm.full === undefined) cm.full = i; });
-  ['grupa','group','kategoria'].forEach(k => { const i = hdr.indexOf(k); if (i >= 0 && cm.group === undefined) cm.group = i; });
-  ['stol','stół','table'].forEach(k => { const i = hdr.indexOf(k); if (i >= 0 && cm.table === undefined) cm.table = i; });
-  const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const ln = lines[i].trim(); if (!ln) continue;
-    const c = ln.split(sep).map(x => x.trim().replace(/^["']|["']$/g, ''));
-    let name = '';
-    if (cm.full !== undefined) name = c[cm.full] || '';
-    else { const f = cm.first !== undefined ? c[cm.first] || '' : ''; const l = cm.last !== undefined ? c[cm.last] || '' : ''; name = (f + ' ' + l).trim(); }
-    if (!name) continue;
-    const rg = (cm.group !== undefined ? c[cm.group] || '' : '').toLowerCase();
-    let group = 'other';
-    if (['family','rodzina'].some(x => rg.includes(x)))   group = 'family';
-    else if (['friend','przyjaciel','znajom'].some(x => rg.includes(x))) group = 'friend';
-    else if (['work','praca'].some(x => rg.includes(x)))  group = 'work';
-    rows.push({ name, group, tableName: cm.table !== undefined ? c[cm.table] || '' : '' });
-  }
-  return { rows, count: rows.length };
-}
-
 function handleFileSelect(e) {
   const f = e.target.files[0]; if (!f) return;
   const fr = new FileReader(); fr.onload = ev => processCSVText(ev.target.result, f.name); fr.readAsText(f, 'UTF-8');
@@ -678,43 +712,99 @@ dz.addEventListener('drop', e => {
 });
 
 function processCSVText(text, fname) {
-  const res = parseCSV(text);
-  const se = document.getElementById('csvStatus'), pb = document.getElementById('csvPreviewBox'), ib = document.getElementById('importBtn');
-  if (res.error) {
-    se.style.display = 'block';
-    se.innerHTML = `<div style="font-size:12px;color:#A32D2D;padding:6px 8px;background:#FCEBEB;border-radius:6px">${res.error}</div>`;
-    pb.style.display = 'none'; ib.style.display = 'none'; pendingImport = null; return;
+  const se = document.getElementById('csvStatus');
+  const mb = document.getElementById('csvMappingBox');
+  const pb = document.getElementById('csvPreviewBox');
+  const ib = document.getElementById('importBtn');
+  const lines = text.trim().split(/\r?\n/);
+  const err = s => { se.style.display = 'block'; se.innerHTML = `<div style="font-size:12px;color:#A32D2D;padding:6px 8px;background:#FCEBEB;border-radius:6px">${s}</div>`; mb.style.display = 'none'; pb.style.display = 'none'; ib.style.display = 'none'; pendingHeaders = []; pendingRawRows = []; };
+  if (lines.length < 2) { err('Za krótki plik.'); return; }
+  const sep = lines[0].includes(';') ? ';' : ',';
+  pendingHeaders = lines[0].split(sep).map(h => h.trim().replace(/^["']|["']$/g, ''));
+  if (!pendingHeaders.length) { err('Nie znaleziono nagłówków.'); return; }
+  pendingRawRows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const ln = lines[i].trim(); if (!ln) continue;
+    pendingRawRows.push(ln.split(sep).map(x => x.trim().replace(/^["']|["']$/g, '')));
   }
-  pendingImport = res.rows; se.style.display = 'block';
-  se.innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">Znaleziono <strong>${res.count}</strong> gości — "${fname}"</div>`;
-  pb.style.display = 'block';
-  document.getElementById('csvPreview').textContent = res.rows.slice(0, 6).map(r => `${r.name} | ${r.group} | ${r.tableName || '—'}`).join('\n') + (res.rows.length > 6 ? '\n…+' + (res.rows.length - 6) : '');
+  se.style.display = 'block';
+  se.innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">Wczytano <strong>"${fname}"</strong> — ${pendingRawRows.length} wierszy, ${pendingHeaders.length} kolumn</div>`;
+  mb.style.display = 'block';
+  renderColumnPicker();
+  applyMapping();
   ib.style.display = 'flex';
 }
 
+function renderColumnPicker() {
+  const hdr = pendingHeaders.map(h => h.toLowerCase());
+  const find = keys => { for (const k of keys) { const i = hdr.indexOf(k); if (i >= 0) return i; } return -1; };
+  const dFirst = Math.max(0, find(['imie','imię','firstname','name','imie_nazwisko','full_name','fullname']));
+  const dLast  = find(['nazwisko','last_name','lastname','surname']);
+  const dGroup = find(['grupa','group','kategoria']);
+  const dTable = find(['stol','stół','table']);
+  const colOpts = (def, withNone) =>
+    (withNone ? `<option value="-1"${def === -1 ? ' selected' : ''}>— brak —</option>` : '') +
+    pendingHeaders.map((h, i) => `<option value="${i}"${i === def ? ' selected' : ''}>${h}</option>`).join('');
+  document.getElementById('csvMappingBox').innerHTML = `
+    <div class="sec-title" style="margin-top:2px">Mapowanie kolumn</div>
+    <div class="row"><label>Imię / nazwa</label><select id="mapFirst" onchange="applyMapping()">${colOpts(dFirst, false)}</select></div>
+    <div class="row"><label>Nazwisko</label><select id="mapLast" onchange="applyMapping()">${colOpts(dLast, true)}</select></div>
+    <div class="row"><label>Kategoria</label><select id="mapGroup" onchange="applyMapping()">${colOpts(dGroup, true)}</select></div>
+    <div class="row"><label>Stół</label><select id="mapTable" onchange="applyMapping()">${colOpts(dTable, true)}</select></div>`;
+}
+
+function applyMapping() {
+  if (!pendingRawRows.length) return;
+  const fi = +document.getElementById('mapFirst').value;
+  const li = +document.getElementById('mapLast').value;
+  const gi = +document.getElementById('mapGroup').value;
+  const ti = +document.getElementById('mapTable').value;
+  const rows = pendingRawRows.slice(0, 6).map(c => {
+    let name = c[fi] || '';
+    if (li >= 0 && c[li]) name = (name + ' ' + c[li]).trim();
+    const group = gi >= 0 ? (c[gi] || '—') : '—';
+    const table = ti >= 0 ? (c[ti] || '—') : '—';
+    return `${name || '(brak)'} | ${group} | ${table}`;
+  });
+  const pb = document.getElementById('csvPreviewBox');
+  pb.style.display = 'block';
+  document.getElementById('csvPreview').textContent = rows.join('\n') + (pendingRawRows.length > 6 ? '\n…+' + (pendingRawRows.length - 6) + ' więcej' : '');
+}
+
 function confirmImport() {
-  if (!pendingImport) return;
+  if (!pendingRawRows.length) return;
+  const fi = +document.getElementById('mapFirst').value;
+  const li = +document.getElementById('mapLast').value;
+  const gi = +document.getElementById('mapGroup').value;
+  const ti = +document.getElementById('mapTable').value;
   const autoT = {};
-  pendingImport.forEach(row => {
-    if (guests.find(g => g.name === row.name)) return;
-    const g = { id: nextGId++, name: row.name, group: row.group, tableId: null };
-    guests.push(g);
-    if (row.tableName) {
-      let t = tables.find(x => x.name.toLowerCase() === row.tableName.toLowerCase());
+  let imported = 0;
+  pendingRawRows.forEach(c => {
+    let name = c[fi] || '';
+    if (li >= 0 && c[li]) name = (name + ' ' + c[li]).trim();
+    if (!name || guests.find(g => g.name === name)) return;
+    const group = resolveGroup(gi >= 0 ? (c[gi] || '') : '');
+    const g = { id: nextGId++, name, group, tableId: null, chairColor: null };
+    guests.push(g); imported++;
+    const tableName = ti >= 0 ? (c[ti] || '') : '';
+    if (tableName) {
+      let t = tables.find(x => x.name.toLowerCase() === tableName.toLowerCase());
       if (!t) {
-        if (!autoT[row.tableName]) {
-          t = { id: nextTId++, name: row.tableName, shape: 'circle', wCm: 180, hCm: 180, seats: 10, color: newColor, angle: 0, x: roomW/2 + (Math.random()-0.5)*400, y: roomH/2 + (Math.random()-0.5)*250, seatGuests: Array(10).fill(null) };
-          tables.push(t); autoT[row.tableName] = t;
-        } else t = autoT[row.tableName];
+        if (!autoT[tableName]) {
+          t = { id: nextTId++, name: tableName, shape: 'circle', wCm: 180, hCm: 180, seats: 10, color: newColor, angle: 0, x: roomW/2 + (Math.random()-0.5)*400, y: roomH/2 + (Math.random()-0.5)*250, seatGuests: Array(10).fill(null) };
+          tables.push(t); autoT[tableName] = t;
+        } else t = autoT[tableName];
       }
       ensureSeatArray(t);
       const si = t.seatGuests.indexOf(null);
       if (si >= 0) { t.seatGuests[si] = g.id; g.tableId = t.id; }
     }
   });
-  pendingImport = null;
+  pendingRawRows = []; pendingHeaders = [];
   document.getElementById('importBtn').style.display = 'none';
-  document.getElementById('csvStatus').innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">Import zakończony!</div>`;
+  document.getElementById('csvMappingBox').style.display = 'none';
+  document.getElementById('csvPreviewBox').style.display = 'none';
+  document.getElementById('csvStatus').innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">Import zakończony! Dodano <strong>${imported}</strong> gości.</div>`;
   renderSidebar(); renderGuestList(); draw(); updateStats(); switchTab('goscie');
 }
 
@@ -722,13 +812,274 @@ function loadExample() {
   processCSVText(`imie,nazwisko,grupa,stol\nAnna,Kowalska,family,Rodzina\nPiotr,Nowak,family,Rodzina\nMarta,Wiśniewska,friend,Przyjaciele\nTomasz,Zając,friend,`, 'przykład.csv');
 }
 
-// ── Init ───────────────────────────────────────────────────────────────────────
-tables.push({ id: nextTId++, name: 'Młodzi',    shape: 'rect',   wCm: 160, hCm: 90,  seats: 2,  color: '#85B7EB', angle: 0,  x: 820, y: 180, seatGuests: [null, null] });
-tables.push({ id: nextTId++, name: 'Rodzina A', shape: 'circle', wCm: 180, hCm: 180, seats: 10, color: '#5DCAA5', angle: 0,  x: 350, y: 540, seatGuests: Array(10).fill(null) });
-tables.push({ id: nextTId++, name: 'Stół 1',    shape: 'rect',   wCm: 180, hCm: 90,  seats: 8,  color: '#EF9F27', angle: 45, x: 800, y: 500, seatGuests: Array(8).fill(null) });
+// ── Category management ────────────────────────────────────────────────────────
+function textForBg(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return (0.299*r + 0.587*g + 0.114*b) > 140 ? '#2C2C2A' : '#f5f4f0';
+}
 
-updateRoomLabel();
-resizeCanvas();
-renderSidebar();
-renderGuestList();
-updateStats();
+function resolveGroup(raw) {
+  const rv = (raw || '').toLowerCase().trim();
+  if (!rv) return groupColors.other ? 'other' : Object.keys(groupColors)[0];
+  for (const [key, gc] of Object.entries(groupColors)) {
+    if (gc.label.toLowerCase() === rv) return key;
+  }
+  if (groupColors.family && ['family','rodzina'].some(x => rv.includes(x))) return 'family';
+  if (groupColors.friend && ['friend','przyjaciel','znajom'].some(x => rv.includes(x))) return 'friend';
+  if (groupColors.work   && ['work','praca'].some(x => rv.includes(x))) return 'work';
+  return groupColors.other ? 'other' : Object.keys(groupColors)[0];
+}
+
+function renderCategoryList() {
+  const panel = document.getElementById('categoryListPanel');
+  if (!panel) return;
+  const keys = Object.keys(groupColors);
+  panel.innerHTML = Object.entries(groupColors).map(([key, gc]) => `
+    <div class="cat-row">
+      <input type="color" class="cat-color-input" value="${gc.bg}"
+             oninput="setCategoryColor('${key}', this.value)">
+      <input type="text" class="cat-name-input" value="${gc.label}"
+             onchange="renameCategory('${key}', this.value)"
+             onblur="renameCategory('${key}', this.value)">
+      <button class="x-btn" onclick="deleteCategory('${key}')"
+              ${keys.length <= 1 ? 'disabled style="opacity:.35;cursor:default"' : ''}>×</button>
+    </div>`).join('');
+}
+
+function refreshGroupSelects() {
+  const opts = Object.entries(groupColors).map(([k, gc]) => `<option value="${k}">${gc.label}</option>`).join('');
+  document.querySelectorAll('.group-select').forEach(sel => {
+    const cur = sel.value;
+    sel.innerHTML = opts;
+    if (groupColors[cur]) sel.value = cur;
+  });
+}
+
+function addCategory() {
+  const palette = ['#FADADD','#D4F0FF','#D4F5D4','#FFF0D4','#E8D4FF','#FFD4F0','#D4EFEF'];
+  const bg = palette[Object.keys(groupColors).length % palette.length];
+  const key = 'cat_' + (nextCatId++);
+  groupColors[key] = { bg, text: textForBg(bg), label: 'Kategoria ' + Object.keys(groupColors).length };
+  renderCategoryList(); refreshGroupSelects(); triggerAutoSave();
+}
+
+function deleteCategory(key) {
+  if (Object.keys(groupColors).length <= 1) return;
+  const fallback = Object.keys(groupColors).find(k => k !== key);
+  guests.forEach(g => { if (g.group === key) g.group = fallback; });
+  delete groupColors[key];
+  renderCategoryList(); refreshGroupSelects(); renderGuestList(); draw();
+}
+
+function setCategoryColor(key, hex) {
+  if (!groupColors[key]) return;
+  groupColors[key].bg = hex;
+  groupColors[key].text = textForBg(hex);
+  renderGuestList(); draw();
+}
+
+function renameCategory(key, label) {
+  if (!groupColors[key] || !label.trim()) return;
+  groupColors[key].label = label.trim();
+  refreshGroupSelects(); renderGuestList();
+}
+
+// ── Export ─────────────────────────────────────────────────────────────────────
+function getExportCanvas() {
+  const tmp = document.createElement('canvas');
+  tmp.width = canvas.width; tmp.height = canvas.height;
+  const tc = tmp.getContext('2d');
+  tc.fillStyle = '#f7f7f5';
+  tc.fillRect(0, 0, tmp.width, tmp.height);
+  tc.drawImage(canvas, 0, 0);
+  return tmp;
+}
+
+function exportJPG() {
+  const tmp = getExportCanvas();
+  const a = document.createElement('a');
+  a.download = 'tableplaner.jpg';
+  a.href = tmp.toDataURL('image/jpeg', 0.95);
+  a.click();
+}
+
+function exportPDF() {
+  if (!window.jspdf) { alert('Biblioteka jsPDF nie jest załadowana. Sprawdź połączenie z internetem.'); return; }
+  const { jsPDF } = window.jspdf;
+  const tmp = getExportCanvas();
+  const cw = tmp.width, ch = tmp.height;
+  const isLandscape = cw >= ch;
+  const pageW = isLandscape ? 297 : 210, pageH = isLandscape ? 210 : 297;
+  const margin = 10;
+  const availW = pageW - margin * 2, availH = pageH - margin * 2;
+  const scale = Math.min(availW / cw, availH / ch);
+  const imgW = cw * scale, imgH = ch * scale;
+  const x = margin + (availW - imgW) / 2, y = margin + (availH - imgH) / 2;
+  const pdf = new jsPDF({ orientation: isLandscape ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+  pdf.addImage(tmp.toDataURL('image/jpeg', 0.95), 'JPEG', x, y, imgW, imgH);
+  pdf.save('tableplaner.pdf');
+}
+
+// ── Sessions ───────────────────────────────────────────────────────────────────
+const TP_IDX  = 'tp_idx';
+const TP_CUR  = 'tp_cur';
+const TP_SESS = id => 'tp_s_' + id;
+
+let currentSessionId = null;
+let autoSaveTimer = null;
+
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+function getIndex() { try { return JSON.parse(localStorage.getItem(TP_IDX) || '[]'); } catch (_) { return []; } }
+function saveIndex(idx) { try { localStorage.setItem(TP_IDX, JSON.stringify(idx)); } catch (_) {} }
+
+function buildSaveState() {
+  return { version: 1, savedAt: new Date().toISOString(), zoom, roomW, roomH, groupColors, tables, guests, nextTId, nextGId, nextCatId };
+}
+
+function applyState(s) {
+  if (!s || s.version !== 1) return false;
+  tables = s.tables || []; guests = s.guests || [];
+  groupColors = s.groupColors || groupColors;
+  roomW = s.roomW || 1200; roomH = s.roomH || 800;
+  nextTId = s.nextTId || (tables.reduce((m, t) => Math.max(m, t.id), 0) + 1);
+  nextGId = s.nextGId || (guests.reduce((m, g) => Math.max(m, g.id), 0) + 1);
+  nextCatId = s.nextCatId || 1;
+  if (s.zoom) { zoom = s.zoom; document.getElementById('zoomSlider').value = Math.round(zoom * 100); document.getElementById('zoomVal').textContent = Math.round(zoom * 100) + '%'; }
+  document.getElementById('roomW').value = roomW; document.getElementById('roomH').value = roomH;
+  selected = null; document.getElementById('propsPanel').style.display = 'none';
+  updateRoomLabel(); resizeCanvas(); renderSidebar(); renderGuestList(); updateStats(); renderCategoryList(); refreshGroupSelects();
+  return true;
+}
+
+function fmtMeta(e) {
+  const d = new Date(e.savedAt);
+  return `${e.tableCount} stołów · ${e.guestCount} gości · ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+}
+
+function saveCurrentSession() {
+  if (!currentSessionId) return;
+  const state = buildSaveState();
+  try { localStorage.setItem(TP_SESS(currentSessionId), JSON.stringify(state)); } catch (_) { return; }
+  const idx = getIndex();
+  const entry = idx.find(e => e.id === currentSessionId);
+  if (entry) { entry.savedAt = state.savedAt; entry.tableCount = tables.length; entry.guestCount = guests.length; }
+  else idx.push({ id: currentSessionId, name: 'Nowy plan', savedAt: state.savedAt, tableCount: tables.length, guestCount: guests.length });
+  saveIndex(idx);
+  try { localStorage.setItem(TP_CUR, currentSessionId); } catch (_) {}
+}
+
+function triggerAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    saveCurrentSession();
+    const entry = getIndex().find(e => e.id === currentSessionId);
+    if (entry) {
+      const row = document.querySelector(`.session-row[data-id="${currentSessionId}"]`);
+      if (row) { const m = row.querySelector('.session-meta'); if (m) m.textContent = fmtMeta(entry); }
+    }
+    const el = document.getElementById('autoSaveStatus');
+    if (el) { const n = new Date(); el.textContent = 'Zapisano ' + n.getHours().toString().padStart(2,'0') + ':' + n.getMinutes().toString().padStart(2,'0'); }
+  }, 0);
+}
+
+function renderSessionList() {
+  const panel = document.getElementById('sessionListPanel');
+  if (!panel) return;
+  const idx = getIndex();
+  panel.innerHTML = idx.map(e => {
+    const isCur = e.id === currentSessionId;
+    return `
+      <div class="session-row${isCur ? ' active' : ''}" data-id="${e.id}">
+        <div class="session-body"${isCur ? '' : ` onclick="loadSession('${e.id}')"`}>
+          <input class="session-name-input" value="${e.name.replace(/"/g,'&quot;')}"
+                 onchange="renameSession('${e.id}',this.value)"
+                 onblur="renameSession('${e.id}',this.value)"
+                 onclick="event.stopPropagation()">
+          <span class="session-meta">${fmtMeta(e)}</span>
+        </div>
+        <button class="x-btn" onclick="deleteSession('${e.id}')"
+                title="Usuń sesję"${idx.length <= 1 ? ' disabled style="opacity:.35;cursor:default"' : ''}>×</button>
+      </div>`;
+  }).join('');
+}
+
+function loadSession(id) {
+  if (id === currentSessionId) return;
+  saveCurrentSession();
+  try {
+    const raw = localStorage.getItem(TP_SESS(id));
+    if (raw && applyState(JSON.parse(raw))) {
+      currentSessionId = id;
+      try { localStorage.setItem(TP_CUR, id); } catch (_) {}
+      renderSessionList();
+    }
+  } catch (_) {}
+}
+
+function deleteSession(id) {
+  const idx = getIndex().filter(e => e.id !== id);
+  saveIndex(idx); try { localStorage.removeItem(TP_SESS(id)); } catch (_) {}
+  if (id === currentSessionId) {
+    if (idx.length) loadSession(idx[idx.length - 1].id);
+    else startNewSession('Nowy plan', true);
+  } else renderSessionList();
+}
+
+function renameSession(id, name) {
+  if (!name.trim()) return;
+  const idx = getIndex(); const e = idx.find(x => x.id === id);
+  if (e) { e.name = name.trim(); saveIndex(idx); triggerAutoSave(); }
+}
+
+function startNewSession(name, withExamples) {
+  saveCurrentSession();
+  const id = genId(); currentSessionId = id;
+  tables = []; guests = [];
+  groupColors = { family:{bg:'#EAF3DE',text:'#27500A',label:'Rodzina'}, friend:{bg:'#EEEDFE',text:'#26215C',label:'Przyjaciel'}, work:{bg:'#FAEEDA',text:'#412402',label:'Praca'}, other:{bg:'#F1EFE8',text:'#2C2C2A',label:'Inne'} };
+  nextTId = 1; nextGId = 1; nextCatId = 1;
+  zoom = 0.6; roomW = 1200; roomH = 800;
+  document.getElementById('zoomSlider').value = 60; document.getElementById('zoomVal').textContent = '60%';
+  if (withExamples) {
+    tables.push({ id: nextTId++, name: 'Młodzi',    shape: 'rect',   wCm: 160, hCm: 90,  seats: 2,  color: '#85B7EB', angle: 0,  x: 820, y: 180, seatGuests: [null, null] });
+    tables.push({ id: nextTId++, name: 'Rodzina A', shape: 'circle', wCm: 180, hCm: 180, seats: 10, color: '#5DCAA5', angle: 0,  x: 350, y: 540, seatGuests: Array(10).fill(null) });
+    tables.push({ id: nextTId++, name: 'Stół 1',    shape: 'rect',   wCm: 180, hCm: 90,  seats: 8,  color: '#EF9F27', angle: 45, x: 800, y: 500, seatGuests: Array(8).fill(null) });
+  }
+  const idx = getIndex();
+  idx.push({ id, name: name || 'Nowy plan', savedAt: new Date().toISOString(), tableCount: tables.length, guestCount: guests.length });
+  saveIndex(idx); try { localStorage.setItem(TP_CUR, id); } catch (_) {}
+  selected = null; document.getElementById('propsPanel').style.display = 'none';
+  updateRoomLabel(); resizeCanvas(); renderSidebar(); renderGuestList(); updateStats(); renderCategoryList(); refreshGroupSelects();
+  renderSessionList();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+(function () {
+  // Migrate from old single-save format
+  try {
+    const old = localStorage.getItem('tableplaner_v1');
+    if (old && !getIndex().length) {
+      const s = JSON.parse(old);
+      if (s.version === 1) {
+        const id = genId(); currentSessionId = id;
+        saveIndex([{ id, name: 'Mój plan', savedAt: s.savedAt || new Date().toISOString(), tableCount: (s.tables||[]).length, guestCount: (s.guests||[]).length }]);
+        localStorage.setItem(TP_SESS(id), old); localStorage.setItem(TP_CUR, id);
+        localStorage.removeItem('tableplaner_v1');
+        applyState(s); renderSessionList(); return;
+      }
+    }
+  } catch (_) {}
+
+  // Resume last active session
+  const idx = getIndex();
+  let curId = null; try { curId = localStorage.getItem(TP_CUR); } catch (_) {}
+  const toLoad = idx.find(e => e.id === curId) ? curId : (idx.length ? idx[idx.length - 1].id : null);
+  if (toLoad) {
+    try {
+      const raw = localStorage.getItem(TP_SESS(toLoad));
+      if (raw && applyState(JSON.parse(raw))) { currentSessionId = toLoad; renderSessionList(); return; }
+    } catch (_) {}
+  }
+
+  // First run — create default session with example data
+  startNewSession('Mój plan', true);
+}());
