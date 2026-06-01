@@ -587,6 +587,7 @@ function draw() {
     }
     ctx.restore();
   });
+  triggerAutoSave();
 }
 
 // ── Hit testing ────────────────────────────────────────────────────────────────
@@ -919,15 +920,166 @@ function exportPDF() {
   pdf.save('tableplaner.pdf');
 }
 
-// ── Init ───────────────────────────────────────────────────────────────────────
-tables.push({ id: nextTId++, name: 'Młodzi',    shape: 'rect',   wCm: 160, hCm: 90,  seats: 2,  color: '#85B7EB', angle: 0,  x: 820, y: 180, seatGuests: [null, null] });
-tables.push({ id: nextTId++, name: 'Rodzina A', shape: 'circle', wCm: 180, hCm: 180, seats: 10, color: '#5DCAA5', angle: 0,  x: 350, y: 540, seatGuests: Array(10).fill(null) });
-tables.push({ id: nextTId++, name: 'Stół 1',    shape: 'rect',   wCm: 180, hCm: 90,  seats: 8,  color: '#EF9F27', angle: 45, x: 800, y: 500, seatGuests: Array(8).fill(null) });
+// ── Sessions ───────────────────────────────────────────────────────────────────
+const TP_IDX  = 'tp_idx';
+const TP_CUR  = 'tp_cur';
+const TP_SESS = id => 'tp_s_' + id;
 
-updateRoomLabel();
-resizeCanvas();
-renderSidebar();
-renderGuestList();
-updateStats();
-renderCategoryList();
-refreshGroupSelects();
+let currentSessionId = null;
+let autoSaveTimer = null;
+
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+function getIndex() { try { return JSON.parse(localStorage.getItem(TP_IDX) || '[]'); } catch (_) { return []; } }
+function saveIndex(idx) { try { localStorage.setItem(TP_IDX, JSON.stringify(idx)); } catch (_) {} }
+
+function buildSaveState() {
+  return { version: 1, savedAt: new Date().toISOString(), zoom, roomW, roomH, groupColors, tables, guests, nextTId, nextGId, nextCatId };
+}
+
+function applyState(s) {
+  if (!s || s.version !== 1) return false;
+  tables = s.tables || []; guests = s.guests || [];
+  groupColors = s.groupColors || groupColors;
+  roomW = s.roomW || 1200; roomH = s.roomH || 800;
+  nextTId = s.nextTId || (tables.reduce((m, t) => Math.max(m, t.id), 0) + 1);
+  nextGId = s.nextGId || (guests.reduce((m, g) => Math.max(m, g.id), 0) + 1);
+  nextCatId = s.nextCatId || 1;
+  if (s.zoom) { zoom = s.zoom; document.getElementById('zoomSlider').value = Math.round(zoom * 100); document.getElementById('zoomVal').textContent = Math.round(zoom * 100) + '%'; }
+  document.getElementById('roomW').value = roomW; document.getElementById('roomH').value = roomH;
+  selected = null; document.getElementById('propsPanel').style.display = 'none';
+  updateRoomLabel(); resizeCanvas(); renderSidebar(); renderGuestList(); updateStats(); renderCategoryList(); refreshGroupSelects();
+  return true;
+}
+
+function fmtMeta(e) {
+  const d = new Date(e.savedAt);
+  return `${e.tableCount} stołów · ${e.guestCount} gości · ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+}
+
+function saveCurrentSession() {
+  if (!currentSessionId) return;
+  const state = buildSaveState();
+  try { localStorage.setItem(TP_SESS(currentSessionId), JSON.stringify(state)); } catch (_) { return; }
+  const idx = getIndex();
+  const entry = idx.find(e => e.id === currentSessionId);
+  if (entry) { entry.savedAt = state.savedAt; entry.tableCount = tables.length; entry.guestCount = guests.length; }
+  else idx.push({ id: currentSessionId, name: 'Nowy plan', savedAt: state.savedAt, tableCount: tables.length, guestCount: guests.length });
+  saveIndex(idx);
+  try { localStorage.setItem(TP_CUR, currentSessionId); } catch (_) {}
+}
+
+function triggerAutoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    saveCurrentSession();
+    const entry = getIndex().find(e => e.id === currentSessionId);
+    if (entry) {
+      const row = document.querySelector(`.session-row[data-id="${currentSessionId}"]`);
+      if (row) { const m = row.querySelector('.session-meta'); if (m) m.textContent = fmtMeta(entry); }
+    }
+    const el = document.getElementById('autoSaveStatus');
+    if (el) { const n = new Date(); el.textContent = 'Zapisano ' + n.getHours().toString().padStart(2,'0') + ':' + n.getMinutes().toString().padStart(2,'0'); }
+  }, 1500);
+}
+
+function renderSessionList() {
+  const panel = document.getElementById('sessionListPanel');
+  if (!panel) return;
+  const idx = getIndex();
+  panel.innerHTML = idx.map(e => {
+    const isCur = e.id === currentSessionId;
+    return `
+      <div class="session-row${isCur ? ' active' : ''}" data-id="${e.id}">
+        <div class="session-body"${isCur ? '' : ` onclick="loadSession('${e.id}')"`}>
+          <input class="session-name-input" value="${e.name.replace(/"/g,'&quot;')}"
+                 onchange="renameSession('${e.id}',this.value)"
+                 onblur="renameSession('${e.id}',this.value)"
+                 onclick="event.stopPropagation()">
+          <span class="session-meta">${fmtMeta(e)}</span>
+        </div>
+        <button class="x-btn" onclick="deleteSession('${e.id}')"
+                title="Usuń sesję"${idx.length <= 1 ? ' disabled style="opacity:.35;cursor:default"' : ''}>×</button>
+      </div>`;
+  }).join('');
+}
+
+function loadSession(id) {
+  if (id === currentSessionId) return;
+  saveCurrentSession();
+  try {
+    const raw = localStorage.getItem(TP_SESS(id));
+    if (raw && applyState(JSON.parse(raw))) {
+      currentSessionId = id;
+      try { localStorage.setItem(TP_CUR, id); } catch (_) {}
+      renderSessionList();
+    }
+  } catch (_) {}
+}
+
+function deleteSession(id) {
+  const idx = getIndex().filter(e => e.id !== id);
+  saveIndex(idx); try { localStorage.removeItem(TP_SESS(id)); } catch (_) {}
+  if (id === currentSessionId) {
+    if (idx.length) loadSession(idx[idx.length - 1].id);
+    else startNewSession('Nowy plan', true);
+  } else renderSessionList();
+}
+
+function renameSession(id, name) {
+  if (!name.trim()) return;
+  const idx = getIndex(); const e = idx.find(x => x.id === id);
+  if (e) { e.name = name.trim(); saveIndex(idx); }
+}
+
+function startNewSession(name, withExamples) {
+  saveCurrentSession();
+  const id = genId(); currentSessionId = id;
+  tables = []; guests = [];
+  groupColors = { family:{bg:'#EAF3DE',text:'#27500A',label:'Rodzina'}, friend:{bg:'#EEEDFE',text:'#26215C',label:'Przyjaciel'}, work:{bg:'#FAEEDA',text:'#412402',label:'Praca'}, other:{bg:'#F1EFE8',text:'#2C2C2A',label:'Inne'} };
+  nextTId = 1; nextGId = 1; nextCatId = 1;
+  zoom = 0.6; roomW = 1200; roomH = 800;
+  document.getElementById('zoomSlider').value = 60; document.getElementById('zoomVal').textContent = '60%';
+  if (withExamples) {
+    tables.push({ id: nextTId++, name: 'Młodzi',    shape: 'rect',   wCm: 160, hCm: 90,  seats: 2,  color: '#85B7EB', angle: 0,  x: 820, y: 180, seatGuests: [null, null] });
+    tables.push({ id: nextTId++, name: 'Rodzina A', shape: 'circle', wCm: 180, hCm: 180, seats: 10, color: '#5DCAA5', angle: 0,  x: 350, y: 540, seatGuests: Array(10).fill(null) });
+    tables.push({ id: nextTId++, name: 'Stół 1',    shape: 'rect',   wCm: 180, hCm: 90,  seats: 8,  color: '#EF9F27', angle: 45, x: 800, y: 500, seatGuests: Array(8).fill(null) });
+  }
+  const idx = getIndex();
+  idx.push({ id, name: name || 'Nowy plan', savedAt: new Date().toISOString(), tableCount: tables.length, guestCount: guests.length });
+  saveIndex(idx); try { localStorage.setItem(TP_CUR, id); } catch (_) {}
+  selected = null; document.getElementById('propsPanel').style.display = 'none';
+  updateRoomLabel(); resizeCanvas(); renderSidebar(); renderGuestList(); updateStats(); renderCategoryList(); refreshGroupSelects();
+  renderSessionList();
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────────
+(function () {
+  // Migrate from old single-save format
+  try {
+    const old = localStorage.getItem('tableplaner_v1');
+    if (old && !getIndex().length) {
+      const s = JSON.parse(old);
+      if (s.version === 1) {
+        const id = genId(); currentSessionId = id;
+        saveIndex([{ id, name: 'Mój plan', savedAt: s.savedAt || new Date().toISOString(), tableCount: (s.tables||[]).length, guestCount: (s.guests||[]).length }]);
+        localStorage.setItem(TP_SESS(id), old); localStorage.setItem(TP_CUR, id);
+        localStorage.removeItem('tableplaner_v1');
+        applyState(s); renderSessionList(); return;
+      }
+    }
+  } catch (_) {}
+
+  // Resume last active session
+  const idx = getIndex();
+  let curId = null; try { curId = localStorage.getItem(TP_CUR); } catch (_) {}
+  const toLoad = idx.find(e => e.id === curId) ? curId : (idx.length ? idx[idx.length - 1].id : null);
+  if (toLoad) {
+    try {
+      const raw = localStorage.getItem(TP_SESS(toLoad));
+      if (raw && applyState(JSON.parse(raw))) { currentSessionId = toLoad; renderSessionList(); return; }
+    } catch (_) {}
+  }
+
+  // First run — create default session with example data
+  startNewSession('Mój plan', true);
+}());
