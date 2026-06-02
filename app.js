@@ -6,7 +6,18 @@ let groupColors = {
   work:   { bg: '#FAEEDA', text: '#412402', label: t('group_work') },
   other:  { bg: '#F1EFE8', text: '#2C2C2A', label: t('group_other') },
 };
-const TABLE_COLORS = ['#5DCAA5','#7F77DD','#F0997B','#EF9F27','#85B7EB','#ED93B1','#D3D1C7'];
+const TABLE_PALETTE = [
+  // Pastels
+  '#fadadd','#fdecc8','#fffde7','#eaf3de','#d4f5f5','#d4f0ff','#eeedfe','#f5d4f0',
+  // Lights
+  '#f4a0a8','#f9d49a','#f7f59c','#a9dfbf','#76d7c4','#85b7eb','#c39bd3','#f0b8e4',
+  // Vivid
+  '#e24b4a','#ef9f27','#f5c518','#5dcaa5','#1abc9c','#3b82f6','#7f77dd','#ed93b1',
+  // Deep
+  '#c0392b','#e8784a','#8db600','#27ae60','#148f77','#2563eb','#6d28d9','#a01060',
+  // Neutrals
+  '#ffffff','#f5f4f0','#d3d1c7','#a09f99','#6b6962','#3c3c3a','#1a1a18','#000000',
+];
 
 // ── State ──────────────────────────────────────────────────────────────────────
 let zoom = 0.6;
@@ -101,16 +112,27 @@ document.getElementById('roomW').addEventListener('change', e => { roomW = +e.ta
 document.getElementById('roomH').addEventListener('change', e => { roomH = +e.target.value; updateRoomLabel(); resizeCanvas(); });
 
 // ── Color pickers ──────────────────────────────────────────────────────────────
-function pickNewColor(el) {
-  document.querySelectorAll('#newColorSwatches .swatch').forEach(s => s.classList.remove('active'));
-  el.classList.add('active');
-  newColor = el.dataset.color;
+function buildSwatches(containerId, activeColor, pickFn) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const active = (activeColor || '').toLowerCase();
+  el.innerHTML = TABLE_PALETTE.map(c =>
+    `<div class="swatch${c === active ? ' active' : ''}" style="background:${c}" data-color="${c}"
+          onclick="${pickFn}('${c}')"></div>`
+  ).join('') +
+  `<input type="color" class="swatch-custom" value="${active || '#5dcaa5'}"
+          onchange="${pickFn}(this.value)" title="Custom color">`;
 }
 
-function pickPropColor(el) {
-  document.querySelectorAll('#propColorSwatches .swatch').forEach(s => s.classList.remove('active'));
-  el.classList.add('active');
-  if (selected !== null) { tables[selected].color = el.dataset.color; renderSidebar(); draw(); }
+function pickNewColor(color) {
+  newColor = color.toLowerCase();
+  buildSwatches('newColorSwatches', newColor, 'pickNewColor');
+}
+
+function pickPropColor(color) {
+  const c = color.toLowerCase();
+  if (selected !== null) { tables[selected].color = c; renderSidebar(); draw(); }
+  buildSwatches('propColorSwatches', c, 'pickPropColor');
 }
 
 // ── Table CRUD ─────────────────────────────────────────────────────────────────
@@ -380,7 +402,7 @@ function selectTable(i) {
   document.getElementById('propName').value  = t.name;
   document.getElementById('propSeats').value = t.seats;
   document.getElementById('rotLabel').textContent = Math.round(t.angle || 0) + '°';
-  document.querySelectorAll('#propColorSwatches .swatch').forEach(s => s.classList.toggle('active', s.dataset.color === t.color));
+  buildSwatches('propColorSwatches', t.color, 'pickPropColor');
 
   const layoutBtns   = document.getElementById('chairLayoutBtns');
   const offsetCtrls  = document.getElementById('chairOffsetControls');
@@ -1237,7 +1259,7 @@ function startNewSession(name, withExamples) {
         saveIndex([{ id, name: 'Mój plan', savedAt: s.savedAt || new Date().toISOString(), tableCount: (s.tables||[]).length, guestCount: (s.guests||[]).length }]);
         localStorage.setItem(TP_SESS(id), old); localStorage.setItem(TP_CUR, id);
         localStorage.removeItem('tableplaner_v1');
-        applyState(s); renderSessionList(); applyLocale(); return;
+        applyState(s); renderSessionList(); applyLocale(); buildSwatches('newColorSwatches', newColor, 'pickNewColor'); return;
       }
     }
   } catch (_) {}
@@ -1249,11 +1271,12 @@ function startNewSession(name, withExamples) {
   if (toLoad) {
     try {
       const raw = localStorage.getItem(TP_SESS(toLoad));
-      if (raw && applyState(JSON.parse(raw))) { currentSessionId = toLoad; renderSessionList(); applyLocale(); return; }
+      if (raw && applyState(JSON.parse(raw))) { currentSessionId = toLoad; renderSessionList(); applyLocale(); buildSwatches('newColorSwatches', newColor, 'pickNewColor'); return; }
     } catch (_) {}
   }
 
   // First run — create default session with example data
   startNewSession(t('my_plan'), true);
   applyLocale();
+  buildSwatches('newColorSwatches', newColor, 'pickNewColor');
 }());

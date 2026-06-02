@@ -109,18 +109,8 @@
         <label data-i18n="seats">Miejsca</label>
         <input type="number" id="newSeats" value="10" min="2" max="30">
       </div>
-      <div class="row">
-        <label data-i18n="color">Kolor</label>
-        <div class="swatches" id="newColorSwatches">
-          <div class="swatch active" style="background:#5DCAA5" data-color="#5DCAA5" onclick="pickNewColor(this)"></div>
-          <div class="swatch" style="background:#7F77DD" data-color="#7F77DD" onclick="pickNewColor(this)"></div>
-          <div class="swatch" style="background:#F0997B" data-color="#F0997B" onclick="pickNewColor(this)"></div>
-          <div class="swatch" style="background:#EF9F27" data-color="#EF9F27" onclick="pickNewColor(this)"></div>
-          <div class="swatch" style="background:#85B7EB" data-color="#85B7EB" onclick="pickNewColor(this)"></div>
-          <div class="swatch" style="background:#ED93B1" data-color="#ED93B1" onclick="pickNewColor(this)"></div>
-          <div class="swatch" style="background:#D3D1C7" data-color="#D3D1C7" onclick="pickNewColor(this)"></div>
-        </div>
-      </div>
+      <div class="sec-title" data-i18n="color">Kolor</div>
+      <div class="palette" id="newColorSwatches"></div>
       <button class="btn btn-primary" onclick="addTable()" data-i18n="add_table">+ Dodaj stół</button>
       <hr class="sep">
       <div class="sec-title"><span data-i18n="tables_count">Stoły</span> (<span id="tableCount">0</span>)</div>
@@ -218,16 +208,11 @@ Piotr,Nowak,family,</div>
         <input type="text" id="propName" oninput="updateProp()" style="font-size:12px;width:100px">
         <label data-i18n="table_seats_label">Miejsca</label>
         <input type="number" id="propSeats" min="2" max="40" oninput="updateProp()" style="font-size:12px;width:46px">
-        <div class="swatches" id="propColorSwatches">
-          <div class="swatch active" style="background:#5DCAA5" data-color="#5DCAA5" onclick="pickPropColor(this)"></div>
-          <div class="swatch" style="background:#7F77DD" data-color="#7F77DD" onclick="pickPropColor(this)"></div>
-          <div class="swatch" style="background:#F0997B" data-color="#F0997B" onclick="pickPropColor(this)"></div>
-          <div class="swatch" style="background:#EF9F27" data-color="#EF9F27" onclick="pickPropColor(this)"></div>
-          <div class="swatch" style="background:#85B7EB" data-color="#85B7EB" onclick="pickPropColor(this)"></div>
-          <div class="swatch" style="background:#ED93B1" data-color="#ED93B1" onclick="pickPropColor(this)"></div>
-          <div class="swatch" style="background:#D3D1C7" data-color="#D3D1C7" onclick="pickPropColor(this)"></div>
-        </div>
         <button class="btn btn-sm btn-danger" onclick="deleteSelected()" data-i18n="delete_btn">🗑 Usuń</button>
+      </div>
+
+      <div class="props-row">
+        <div class="palette" id="propColorSwatches"></div>
       </div>
 
       <div class="props-row">
