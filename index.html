@@ -193,6 +193,7 @@ Piotr,Nowak,family,</div>
       <button class="btn btn-sm" style="margin-left:auto" onclick="exportJPG()" data-i18n-title="export_jpg_title" title="Eksportuj jako JPG">↓ JPG</button>
       <button class="btn btn-sm" onclick="exportPDF()" data-i18n-title="export_pdf_title" title="Eksportuj jako PDF">↓ PDF</button>
       <span>|</span>
+      <a href="https://buycoffee.to/marcinsiwak" target="_blank" rel="noopener" class="btn btn-sm coffee-btn">☕ Buy me a coffee</a>
       <select id="langSelect" onchange="setLanguage(this.value)" class="lang-select">
         <option value="pl">🇵🇱 Polski</option>
         <option value="en">🇬🇧 English</option>
@@ -272,6 +273,13 @@ Piotr,Nowak,family,</div>
     border-radius: 4px; background: var(--color-bg-primary, #fff);
     cursor: pointer; color: var(--color-text-primary, #2c2c2a);
   }
+  .coffee-btn {
+    text-decoration: none;
+    background: #FDECC8; color: #7A4F1D;
+    border-color: #e8c97a !important;
+    white-space: nowrap;
+  }
+  .coffee-btn:hover { background: #f9e0a0; }
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
