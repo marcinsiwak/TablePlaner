@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TablePlaner 💍</title>
+  <title>TablePlaner</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -241,6 +241,28 @@ Piotr,Nowak,family,</div>
         </div>
         <span id="rotLabel" style="font-size:11px;color:#888;min-width:36px">0°</span>
         <button class="rot-btn" onclick="rotateSelected(0,true)" style="color:#E24B4A" data-i18n="reset">Reset</button>
+      </div>
+
+      <div class="props-row">
+        <div class="rot-btns">
+          <button id="chairEditBtn" class="rot-btn" onclick="toggleChairEditMode()" data-i18n="chair_edit_mode">Move chairs</button>
+          <button class="rot-btn" onclick="resetChairPositions()" style="color:#E24B4A" data-i18n="chair_reset_pos">Reset positions</button>
+        </div>
+      </div>
+
+      <div class="props-row" id="chairPlacementRow">
+        <span data-i18n="chair_placement" style="font-size:12px;color:#888;white-space:nowrap">Chair placement</span>
+        <div class="rot-btns" id="chairLayoutBtns" style="display:none">
+          <button class="rot-btn" data-layout="tb" onclick="pickChairLayout('tb',this)" data-i18n="layout_tb">Top &amp; Bottom</button>
+          <button class="rot-btn" data-layout="all" onclick="pickChairLayout('all',this)" data-i18n="layout_all">All sides</button>
+          <button class="rot-btn" data-layout="t" onclick="pickChairLayout('t',this)" data-i18n="layout_top">Top only</button>
+          <button class="rot-btn" data-layout="b" onclick="pickChairLayout('b',this)" data-i18n="layout_bottom">Bottom only</button>
+        </div>
+        <div id="chairOffsetControls" style="display:none;align-items:center;gap:6px">
+          <span data-i18n="chair_offset" style="font-size:12px;color:#888">Offset</span>
+          <input type="range" id="chairOffsetSlider" min="0" max="359" value="0" style="width:80px" oninput="setChairOffset(this.value)">
+          <span id="chairOffsetVal" style="font-size:11px;color:#888;min-width:30px">0°</span>
+        </div>
       </div>
 
       <div>

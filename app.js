@@ -19,6 +19,7 @@ let newColor = '#5DCAA5';
 let dragging = false, dragOffX = 0, dragOffY = 0;
 let rotating = false, rotStartAngle = 0, rotStartRot = 0;
 let dragSeatFrom = null;
+let chairEditMode = false, draggingChair = null;
 let roomW = 1200, roomH = 800;
 let pendingHeaders = [];
 let pendingRawRows = [];
@@ -173,6 +174,34 @@ function rotateSelected(deg, reset = false) {
   t.angle = reset ? 0 : ((t.angle || 0) + deg + 360) % 360;
   document.getElementById('rotLabel').textContent = Math.round(t.angle) + '°';
   renderSidebar(); draw();
+}
+
+function pickChairLayout(layout, el) {
+  if (selected === null) return;
+  tables[selected].chairSides = layout;
+  document.querySelectorAll('#chairLayoutBtns .rot-btn').forEach(b => b.classList.toggle('active', b.dataset.layout === layout));
+  renderSidebar(); draw();
+}
+
+function toggleChairEditMode() {
+  chairEditMode = !chairEditMode;
+  draggingChair = null;
+  const btn = document.getElementById('chairEditBtn');
+  if (btn) btn.classList.toggle('active', chairEditMode);
+  draw();
+}
+
+function resetChairPositions() {
+  if (selected === null) return;
+  tables[selected].seatCustomPos = null;
+  draw();
+}
+
+function setChairOffset(val) {
+  if (selected === null) return;
+  tables[selected].chairOffset = +val;
+  document.getElementById('chairOffsetVal').textContent = Math.round(val) + '°';
+  draw();
 }
 
 // ── Guest CRUD ─────────────────────────────────────────────────────────────────
@@ -343,6 +372,7 @@ function renderGuestList() {
 }
 
 function selectTable(i) {
+  if (i !== selected) { chairEditMode = false; draggingChair = null; }
   selected = i; renderSidebar();
   const t = tables[i]; ensureSeatArray(t);
   document.getElementById('propsPanel').style.display = 'flex';
@@ -351,6 +381,24 @@ function selectTable(i) {
   document.getElementById('propSeats').value = t.seats;
   document.getElementById('rotLabel').textContent = Math.round(t.angle || 0) + '°';
   document.querySelectorAll('#propColorSwatches .swatch').forEach(s => s.classList.toggle('active', s.dataset.color === t.color));
+
+  const layoutBtns   = document.getElementById('chairLayoutBtns');
+  const offsetCtrls  = document.getElementById('chairOffsetControls');
+  if (t.shape === 'rect') {
+    layoutBtns.style.display  = 'flex';
+    offsetCtrls.style.display = 'none';
+    const layout = t.chairSides || 'tb';
+    document.querySelectorAll('#chairLayoutBtns .rot-btn').forEach(b => b.classList.toggle('active', b.dataset.layout === layout));
+  } else {
+    layoutBtns.style.display  = 'none';
+    offsetCtrls.style.display = 'flex';
+    const off = t.chairOffset || 0;
+    document.getElementById('chairOffsetSlider').value = off;
+    document.getElementById('chairOffsetVal').textContent = Math.round(off) + '°';
+  }
+  const editBtn = document.getElementById('chairEditBtn');
+  if (editBtn) editBtn.classList.toggle('active', chairEditMode);
+
   renderSeatPanel(); draw();
 }
 
@@ -431,13 +479,76 @@ function updateProp() {
     if (newSeats < t.seats) {
       for (let i = newSeats; i < t.seats; i++) { const gid = t.seatGuests[i]; if (gid) { const g = guests.find(x => x.id === gid); if (g) g.tableId = null; } }
       t.seatGuests = t.seatGuests.slice(0, newSeats);
+      if (t.seatCustomPos) t.seatCustomPos = t.seatCustomPos.slice(0, newSeats);
     } else {
       while (t.seatGuests.length < newSeats) t.seatGuests.push(null);
+      if (t.seatCustomPos) while (t.seatCustomPos.length < newSeats) t.seatCustomPos.push(null);
     }
     t.seats = newSeats;
   }
   document.getElementById('propTitle').textContent = newName;
   renderSidebar(); renderGuestList(); renderSeatPanel(); draw(); updateStats();
+}
+
+// ── Chair layout helpers ───────────────────────────────────────────────────────
+function distributeAllSides(n) {
+  const base = Math.floor(n / 4), extra = n - base * 4;
+  return { nT: base + (extra > 0 ? 1 : 0), nR: base + (extra > 1 ? 1 : 0), nB: base + (extra > 2 ? 1 : 0), nL: base };
+}
+
+function getChairPositions(t) {
+  const twPx = t.wCm * zoom, thPx = t.hCm * zoom;
+  const chairR = Math.max(3, 22 * zoom);
+  const pos = [];
+  if (t.shape === 'circle') {
+    const r = twPx / 2;
+    const offsetRad = ((t.chairOffset || 0) - 90) * Math.PI / 180;
+    for (let s = 0; s < t.seats; s++) {
+      const a = (s / t.seats) * Math.PI * 2 + offsetRad;
+      pos.push({ x: (r + chairR + CHAIR_GAP*zoom)*Math.cos(a), y: (r + chairR + CHAIR_GAP*zoom)*Math.sin(a) });
+    }
+  } else {
+    const hw = twPx/2, hh = thPx/2, sides = t.chairSides || 'tb';
+    if (sides === 'tb') {
+      const nT = Math.ceil(t.seats/2), nB = Math.floor(t.seats/2);
+      const slotW = (twPx - CHAIR_GAP*zoom*2) / (Math.max(nT,nB)||1);
+      for (let s = 0; s < nT; s++) pos.push({ x: -hw+CHAIR_GAP*zoom+slotW*(s+0.5), y: -hh-chairR-CHAIR_GAP*zoom });
+      for (let s = 0; s < nB; s++) pos.push({ x: -hw+CHAIR_GAP*zoom+slotW*(s+0.5), y:  hh+chairR+CHAIR_GAP*zoom });
+    } else if (sides === 't') {
+      const slotW = (twPx - CHAIR_GAP*zoom*2) / (t.seats||1);
+      for (let s = 0; s < t.seats; s++) pos.push({ x: -hw+CHAIR_GAP*zoom+slotW*(s+0.5), y: -hh-chairR-CHAIR_GAP*zoom });
+    } else if (sides === 'b') {
+      const slotW = (twPx - CHAIR_GAP*zoom*2) / (t.seats||1);
+      for (let s = 0; s < t.seats; s++) pos.push({ x: -hw+CHAIR_GAP*zoom+slotW*(s+0.5), y: hh+chairR+CHAIR_GAP*zoom });
+    } else if (sides === 'all') {
+      const { nT, nR, nB: nBo, nL } = distributeAllSides(t.seats);
+      const slotW = (twPx - CHAIR_GAP*zoom*2) / (Math.max(nT,nBo)||1);
+      const slotH = (thPx - CHAIR_GAP*zoom*2) / (Math.max(nR,nL)||1);
+      for (let s = 0; s < nT;  s++) pos.push({ x: -hw+CHAIR_GAP*zoom+slotW*(s+0.5),  y: -hh-chairR-CHAIR_GAP*zoom });
+      for (let s = 0; s < nR;  s++) pos.push({ x:  hw+chairR+CHAIR_GAP*zoom, y: -hh+CHAIR_GAP*zoom+slotH*(s+0.5) });
+      for (let s = 0; s < nBo; s++) pos.push({ x:  hw-CHAIR_GAP*zoom-slotW*(s+0.5),  y:  hh+chairR+CHAIR_GAP*zoom });
+      for (let s = 0; s < nL;  s++) pos.push({ x: -hw-chairR-CHAIR_GAP*zoom, y:  hh-CHAIR_GAP*zoom-slotH*(s+0.5) });
+    }
+  }
+  // Apply custom overrides (stored in cm, relative to table centre)
+  if (t.seatCustomPos) {
+    for (let i = 0; i < pos.length; i++) {
+      if (t.seatCustomPos[i]) pos[i] = { x: t.seatCustomPos[i].x * zoom, y: t.seatCustomPos[i].y * zoom };
+    }
+  }
+  return pos;
+}
+
+function getChairAt(mx, my, tableIdx) {
+  const t = tables[tableIdx];
+  const { lx, ly } = localPoint(t, mx, my);
+  const chairR = Math.max(3, 22 * zoom) + 4; // +4 tolerance
+  const pos = getChairPositions(t);
+  for (let i = pos.length - 1; i >= 0; i--) {
+    const dx = lx - pos[i].x, dy = ly - pos[i].y;
+    if (dx*dx + dy*dy <= chairR*chairR) return i;
+  }
+  return -1;
 }
 
 // ── Canvas drawing ─────────────────────────────────────────────────────────────
@@ -525,44 +636,27 @@ function draw() {
       ctx.setLineDash([]);
     }
 
-    if (t.shape === 'circle') {
-      const r = twPx / 2;
-      for (let s = 0; s < t.seats; s++) {
-        const a = (s / t.seats) * Math.PI * 2 - Math.PI / 2;
-        const cx2 = (r + chairR + CHAIR_GAP * zoom) * Math.cos(a);
-        const cy2 = (r + chairR + CHAIR_GAP * zoom) * Math.sin(a);
-        const gid = t.seatGuests[s];
-        const g   = gid ? guests.find(x => x.id === gid) : null;
-        drawChair(cx2, cy2, chairR, g);
-        if (!g || zoom <= 0.45) {
-          ctx.fillStyle = '#999'; ctx.font = `${Math.max(6, 7*zoom)}px sans-serif`;
-          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-          ctx.fillText(s + 1, cx2, cy2);
-        }
+    getChairPositions(t).forEach((p, s) => {
+      const gid = t.seatGuests[s];
+      const g   = gid ? guests.find(x => x.id === gid) : null;
+      drawChair(p.x, p.y, chairR, g);
+      if (!g || zoom <= 0.45) {
+        ctx.fillStyle = '#999'; ctx.font = `${Math.max(6, 7*zoom)}px sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(s + 1, p.x, p.y);
       }
-      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2);
-      ctx.fillStyle = t.color; ctx.fill();
-      ctx.strokeStyle = dk; ctx.lineWidth = 1; ctx.stroke();
+      if (chairEditMode && isSel) {
+        ctx.beginPath(); ctx.arc(p.x, p.y, chairR + 2, 0, Math.PI * 2);
+        ctx.strokeStyle = draggingChair === s ? '#E24B4A' : '#378ADD';
+        ctx.lineWidth = 1.5; ctx.setLineDash([]); ctx.stroke();
+      }
+    });
+
+    if (t.shape === 'circle') {
+      ctx.beginPath(); ctx.arc(0, 0, twPx/2, 0, Math.PI*2);
+      ctx.fillStyle = t.color; ctx.fill(); ctx.strokeStyle = dk; ctx.lineWidth = 1; ctx.stroke();
     } else {
       const hw = twPx/2, hh = thPx/2;
-      const st = Math.ceil(t.seats / 2), sb = Math.floor(t.seats / 2);
-      const slotW = (twPx - CHAIR_GAP * zoom * 2) / (Math.max(st, sb) || 1);
-      for (let s = 0; s < st; s++) {
-        const fx = -hw + CHAIR_GAP * zoom + slotW * (s + 0.5);
-        const fy = -hh - chairR - CHAIR_GAP * zoom;
-        const gid = t.seatGuests[s];
-        const g   = gid ? guests.find(x => x.id === gid) : null;
-        drawChair(fx, fy, chairR, g);
-        if (!g || zoom <= 0.45) { ctx.fillStyle = '#999'; ctx.font = `${Math.max(6,7*zoom)}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(s+1, fx, fy); }
-      }
-      for (let s = 0; s < sb; s++) {
-        const fx = -hw + CHAIR_GAP * zoom + slotW * (s + 0.5);
-        const fy = hh + chairR + CHAIR_GAP * zoom;
-        const gid = t.seatGuests[st + s];
-        const g   = gid ? guests.find(x => x.id === gid) : null;
-        drawChair(fx, fy, chairR, g);
-        if (!g || zoom <= 0.45) { ctx.fillStyle = '#999'; ctx.font = `${Math.max(6,7*zoom)}px sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(st+s+1, fx, fy); }
-      }
       ctx.fillStyle = t.color; roundRect(ctx, -hw, -hh, twPx, thPx, 4 * zoom);
       ctx.fill(); ctx.strokeStyle = dk; ctx.lineWidth = 1; ctx.stroke();
     }
@@ -628,6 +722,10 @@ function getAngleFromCenter(t, mx, my) {
 // ── Mouse / touch events ───────────────────────────────────────────────────────
 canvas.addEventListener('mousedown', e => {
   const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  if (chairEditMode && selected !== null) {
+    const ci = getChairAt(mx, my, selected);
+    if (ci >= 0) { draggingChair = ci; canvas.style.cursor = 'grabbing'; return; }
+  }
   if (getRotHandleAt(mx, my)) {
     rotating = true;
     const t = tables[selected]; rotStartAngle = getAngleFromCenter(t, mx, my); rotStartRot = t.angle || 0;
@@ -639,13 +737,20 @@ canvas.addEventListener('mousedown', e => {
     dragOffX = mx - (20 + tables[idx].x * zoom); dragOffY = my - (20 + tables[idx].y * zoom);
     selectTable(idx); canvas.style.cursor = 'grabbing';
   } else {
-    if (selected !== null) { selected = null; document.getElementById('propsPanel').style.display = 'none'; renderSidebar(); renderGuestList(); draw(); }
+    if (selected !== null) { selected = null; chairEditMode = false; document.getElementById('propsPanel').style.display = 'none'; renderSidebar(); renderGuestList(); draw(); }
     closeGuestPicker();
   }
 });
 
 canvas.addEventListener('mousemove', e => {
   const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  if (draggingChair !== null && selected !== null) {
+    const t = tables[selected];
+    const { lx, ly } = localPoint(t, mx, my);
+    if (!t.seatCustomPos) t.seatCustomPos = new Array(t.seats).fill(null);
+    t.seatCustomPos[draggingChair] = { x: lx / zoom, y: ly / zoom };
+    draw(); return;
+  }
   if (rotating && selected !== null) {
     const t = tables[selected];
     let delta = getAngleFromCenter(t, mx, my) - rotStartAngle;
@@ -659,17 +764,31 @@ canvas.addEventListener('mousemove', e => {
     tables[selected].y = Math.max(0, Math.min(roomH, (my - dragOffY - 20) / zoom));
     draw(); return;
   }
-  if (getRotHandleAt(mx, my)) canvas.style.cursor = 'crosshair';
+  if (chairEditMode && selected !== null && getChairAt(mx, my, selected) >= 0) canvas.style.cursor = 'grab';
+  else if (getRotHandleAt(mx, my)) canvas.style.cursor = 'crosshair';
   else if (getTableAt(mx, my) >= 0) canvas.style.cursor = 'grab';
   else canvas.style.cursor = 'default';
 });
 
-canvas.addEventListener('mouseup',    () => { if (rotating) renderSidebar(); rotating = false; dragging = false; canvas.style.cursor = 'default'; });
-canvas.addEventListener('mouseleave', () => { rotating = false; dragging = false; canvas.style.cursor = 'default'; });
+canvas.addEventListener('mouseup', () => {
+  if (rotating) renderSidebar();
+  rotating = false; dragging = false;
+  if (draggingChair !== null) { draggingChair = null; triggerAutoSave(); }
+  canvas.style.cursor = 'default';
+});
+canvas.addEventListener('mouseleave', () => {
+  rotating = false; dragging = false;
+  if (draggingChair !== null) { draggingChair = null; triggerAutoSave(); }
+  canvas.style.cursor = 'default';
+});
 
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   const t2 = e.touches[0], r = canvas.getBoundingClientRect(), mx = t2.clientX - r.left, my = t2.clientY - r.top;
+  if (chairEditMode && selected !== null) {
+    const ci = getChairAt(mx, my, selected);
+    if (ci >= 0) { draggingChair = ci; return; }
+  }
   if (getRotHandleAt(mx, my) && selected !== null) {
     rotating = true; const t = tables[selected]; rotStartAngle = getAngleFromCenter(t, mx, my); rotStartRot = t.angle || 0; return;
   }
@@ -680,11 +799,22 @@ canvas.addEventListener('touchstart', e => {
 canvas.addEventListener('touchmove', e => {
   e.preventDefault();
   const t2 = e.touches[0], r = canvas.getBoundingClientRect(), mx = t2.clientX - r.left, my = t2.clientY - r.top;
+  if (draggingChair !== null && selected !== null) {
+    const t = tables[selected];
+    const { lx, ly } = localPoint(t, mx, my);
+    if (!t.seatCustomPos) t.seatCustomPos = new Array(t.seats).fill(null);
+    t.seatCustomPos[draggingChair] = { x: lx / zoom, y: ly / zoom };
+    draw(); return;
+  }
   if (rotating && selected !== null) { const t = tables[selected]; t.angle = ((rotStartRot + (getAngleFromCenter(t, mx, my) - rotStartAngle)) % 360 + 360) % 360; draw(); return; }
   if (dragging && selected !== null) { tables[selected].x = Math.max(0, Math.min(roomW, (mx - dragOffX - 20) / zoom)); tables[selected].y = Math.max(0, Math.min(roomH, (my - dragOffY - 20) / zoom)); draw(); }
 }, { passive: false });
 
-canvas.addEventListener('touchend', () => { if (rotating) renderSidebar(); rotating = false; dragging = false; });
+canvas.addEventListener('touchend', () => {
+  if (rotating) renderSidebar();
+  rotating = false; dragging = false;
+  if (draggingChair !== null) { draggingChair = null; triggerAutoSave(); }
+});
 
 // ── Keyboard shortcuts ─────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
