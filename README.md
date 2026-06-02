@@ -1,33 +1,25 @@
-# TablePlaner 💍
+# TablePlaner
 
-Aplikacja webowa do planowania rozsadzenia gości na weselu.
+A web application for planning table seating arrangements.
 
-## Funkcje
+## Features
 
-- 🏛️ Wizualny plan sali z rzeczywistymi wymiarami (w cm)
-- 🪑 Stoły okrągłe (ø 180 cm), prostokątne (180×90 cm), stół Młodych (160×90 cm)
-- 🔄 Obracanie stołów (mysz, przyciski, klawiatura)
-- 👥 Import gości z pliku CSV
-- 🎯 Przypisywanie gości do konkretnych krzeseł
-- ✏️ Edycja imion i grup gości
-- 🔍 Wyszukiwarka gości
-- 📐 Zoom i auto-układ stołów
-- 💾 Eksport planu
+- Visual floor plan with real-world dimensions (in cm)
+- Round (diameter 180 cm), rectangular (180x90 cm), and couple (160x90 cm) table presets
+- Custom table shapes and sizes
+- Drag-and-drop table positioning
+- Table rotation via mouse, buttons, or keyboard arrows
+- Multiple sessions with auto-save
+- Guest management with group categories
+- CSV import with column mapping
+- Assign guests to specific seats with drag-and-drop reordering
+- Guest search and inline editing
+- Chair color customization
+- Zoom control and auto-arrange
+- Export to JPG and PDF
+- 7 languages: Polish, English, Spanish, Italian, French, German, Ukrainian
 
-## Uruchomienie
+## Support
 
-Otwórz `index.html` w przeglądarce — nie wymaga serwera ani instalacji.
-
-## Format CSV
-
-```csv
-imie,nazwisko,grupa,stol
-Anna,Kowalska,family,Rodzina
-Piotr,Nowak,friend,Przyjaciele
-```
-
-Grupy: `family`, `friend`, `work`, `other`
-
-## Technologie
-
-Czysty HTML5 + CSS3 + Canvas API (bez zewnętrznych frameworków)
+If this app helped you plan your special day, consider buying me a coffee:
+https://buycoffee.to/marcinsiwak
