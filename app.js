@@ -29,8 +29,8 @@ let editingGuestId = null;
 let nextCatId = 1;
 
 // ── Canvas setup ───────────────────────────────────────────────────────────────
-const canvas = document.getElementById('floorCanvas');
-const ctx = canvas.getContext('2d');
+let canvas = document.getElementById('floorCanvas');
+let ctx = canvas.getContext('2d');
 
 // ── Tab switching ──────────────────────────────────────────────────────────────
 function switchTab(name) {
@@ -1026,32 +1026,59 @@ function dismissCoffeePopup(doCoffee) {
   document.getElementById('coffeePopup').style.display = 'none';
   const type = _pendingExport; _pendingExport = null;
   if (type === 'jpg') exportJPG();
+  else if (type === 'png') exportPNG();
   else if (type === 'pdf') exportPDF();
 }
 
 // ── Export ─────────────────────────────────────────────────────────────────────
-function getExportCanvas() {
+function renderHighResCanvas() {
+  const TARGET_PX = 3600;
+  const exportZoom = TARGET_PX / Math.max(roomW, roomH);
+  const ew = Math.round(roomW * exportZoom) + 40;
+  const eh = Math.round(roomH * exportZoom) + 40;
+
   const tmp = document.createElement('canvas');
-  tmp.width = canvas.width; tmp.height = canvas.height;
-  const tc = tmp.getContext('2d');
-  tc.fillStyle = '#f7f7f5';
-  tc.fillRect(0, 0, tmp.width, tmp.height);
-  tc.drawImage(canvas, 0, 0);
+  tmp.width = ew; tmp.height = eh;
+
+  const savedCanvas = canvas, savedCtx = ctx, savedZoom = zoom;
+  const savedSelected = selected, savedChairEdit = chairEditMode;
+  canvas = tmp; ctx = tmp.getContext('2d');
+  zoom = exportZoom; selected = null; chairEditMode = false;
+
+  draw();
+
+  // Fill any transparent margin area with background colour
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.fillStyle = '#f7f7f5';
+  ctx.fillRect(0, 0, ew, eh);
+  ctx.globalCompositeOperation = 'source-over';
+
+  canvas = savedCanvas; ctx = savedCtx; zoom = savedZoom;
+  selected = savedSelected; chairEditMode = savedChairEdit;
+
   return tmp;
 }
 
 function exportJPG() {
-  const tmp = getExportCanvas();
+  const tmp = renderHighResCanvas();
   const a = document.createElement('a');
   a.download = 'tableplaner.jpg';
   a.href = tmp.toDataURL('image/jpeg', 0.95);
   a.click();
 }
 
+function exportPNG() {
+  const tmp = renderHighResCanvas();
+  const a = document.createElement('a');
+  a.download = 'tableplaner.png';
+  a.href = tmp.toDataURL('image/png');
+  a.click();
+}
+
 function exportPDF() {
   if (!window.jspdf) { alert(t('jspdf_missing')); return; }
   const { jsPDF } = window.jspdf;
-  const tmp = getExportCanvas();
+  const tmp = renderHighResCanvas();
   const cw = tmp.width, ch = tmp.height;
   const isLandscape = cw >= ch;
   const pageW = isLandscape ? 297 : 210, pageH = isLandscape ? 210 : 297;
