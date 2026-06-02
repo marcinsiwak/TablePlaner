@@ -295,8 +295,10 @@ function openGuestPicker(seatIdx) {
   const overlay = document.getElementById('guestPickerOverlay');
   overlay.style.display = 'block';
   const pp = document.getElementById('propsPanel').getBoundingClientRect();
-  overlay.style.bottom = (window.innerHeight - pp.top + 4) + 'px';
-  overlay.style.left = '290px';
+  overlay.style.bottom = 'auto';
+  overlay.style.top  = '80px';
+  overlay.style.left = 'auto';
+  overlay.style.right = (window.innerWidth - pp.left + 6) + 'px';
   setTimeout(() => document.getElementById('pickerSearch').focus(), 50);
 }
 
@@ -397,7 +399,9 @@ function selectTable(i) {
   if (i !== selected) { chairEditMode = false; draggingChair = null; }
   selected = i; renderSidebar();
   const t = tables[i]; ensureSeatArray(t);
-  document.getElementById('propsPanel').style.display = 'flex';
+  const propsPanel = document.getElementById('propsPanel');
+  propsPanel.style.display = 'flex';
+  propsPanel.style.width = propsPanelWidth + 'px';
   document.getElementById('propTitle').textContent = t.name;
   document.getElementById('propName').value  = t.name;
   document.getElementById('propSeats').value = t.seats;
@@ -1035,6 +1039,43 @@ function renameCategory(key, label) {
   groupColors[key].label = label.trim();
   refreshGroupSelects(); renderGuestList();
 }
+
+// ── Props panel resize ─────────────────────────────────────────────────────────
+const PROPS_W_KEY = 'tp_props_w';
+let propsPanelWidth = (() => {
+  try { return Math.min(500, Math.max(220, parseInt(localStorage.getItem(PROPS_W_KEY)) || 280)); } catch (_) { return 280; }
+})();
+
+(function initPropsResize() {
+  const panel  = document.getElementById('propsPanel');
+  const handle = document.getElementById('propsResizeHandle');
+  if (!panel || !handle) return;
+  panel.style.width = propsPanelWidth + 'px';
+
+  let resizing = false, startX = 0, startW = 0;
+
+  handle.addEventListener('mousedown', e => {
+    resizing = true; startX = e.clientX; startW = panel.offsetWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!resizing) return;
+    const newW = Math.min(500, Math.max(220, startW + (startX - e.clientX)));
+    panel.style.width = newW + 'px';
+    propsPanelWidth = newW;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!resizing) return;
+    resizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    try { localStorage.setItem(PROPS_W_KEY, propsPanelWidth); } catch (_) {}
+  });
+}());
 
 // ── Export popup ──────────────────────────────────────────────────────────────
 let _pendingExport = null;
