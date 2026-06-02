@@ -1077,6 +1077,43 @@ let propsPanelWidth = (() => {
   });
 }());
 
+// ── Sidebar resize ─────────────────────────────────────────────────────────────
+const SIDEBAR_W_KEY = 'tp_sidebar_w';
+let sidebarWidth = (() => {
+  try { return Math.min(480, Math.max(200, parseInt(localStorage.getItem(SIDEBAR_W_KEY)) || 280)); } catch (_) { return 280; }
+})();
+
+(function initSidebarResize() {
+  const panel  = document.querySelector('.sidebar');
+  const handle = document.getElementById('sidebarResizeHandle');
+  if (!panel || !handle) return;
+  panel.style.width = sidebarWidth + 'px';
+
+  let resizing = false, startX = 0, startW = 0;
+
+  handle.addEventListener('mousedown', e => {
+    resizing = true; startX = e.clientX; startW = panel.offsetWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!resizing) return;
+    const newW = Math.min(480, Math.max(200, startW + (e.clientX - startX)));
+    panel.style.width = newW + 'px';
+    sidebarWidth = newW;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!resizing) return;
+    resizing = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    try { localStorage.setItem(SIDEBAR_W_KEY, sidebarWidth); } catch (_) {}
+  });
+}());
+
 // ── Export popup ──────────────────────────────────────────────────────────────
 let _pendingExport = null;
 
