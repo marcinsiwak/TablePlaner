@@ -1,10 +1,10 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CHAIR_GAP = 5;
 let groupColors = {
-  family: { bg: '#EAF3DE', text: '#27500A', label: 'Rodzina' },
-  friend: { bg: '#EEEDFE', text: '#26215C', label: 'Przyjaciel' },
-  work:   { bg: '#FAEEDA', text: '#412402', label: 'Praca' },
-  other:  { bg: '#F1EFE8', text: '#2C2C2A', label: 'Inne' },
+  family: { bg: '#EAF3DE', text: '#27500A', label: t('group_family') },
+  friend: { bg: '#EEEDFE', text: '#26215C', label: t('group_friend') },
+  work:   { bg: '#FAEEDA', text: '#412402', label: t('group_work') },
+  other:  { bg: '#F1EFE8', text: '#2C2C2A', label: t('group_other') },
 };
 const TABLE_COLORS = ['#5DCAA5','#7F77DD','#F0997B','#EF9F27','#85B7EB','#ED93B1','#D3D1C7'];
 
@@ -115,7 +115,7 @@ function pickPropColor(el) {
 // ── Table CRUD ─────────────────────────────────────────────────────────────────
 function addTable() {
   const p = getTypeParams();
-  const name  = document.getElementById('newName').value.trim() || 'Stół ' + nextTId;
+  const name  = document.getElementById('newName').value.trim() || t('default_table_name') + ' ' + nextTId;
   const seats = Math.max(2, +document.getElementById('newSeats').value);
   tables.push({
     id: nextTId++, name, shape: p.shape, wCm: p.wCm, hCm: p.hCm,
@@ -253,7 +253,7 @@ function renderPicker() {
   const q = (document.getElementById('pickerSearch').value || '').toLowerCase();
   const avail = guests.filter(g => !g.tableId && (!q || g.name.toLowerCase().includes(q)));
   const list = document.getElementById('pickerList');
-  if (!avail.length) { list.innerHTML = '<div style="font-size:12px;color:#888;padding:4px">Brak dostępnych gości</div>'; return; }
+  if (!avail.length) { list.innerHTML = `<div style="font-size:12px;color:#888;padding:4px">${t('no_available_guests')}</div>`; return; }
   list.innerHTML = avail.map(g => {
     const gc = groupColors[g.group] || groupColors.other || Object.values(groupColors)[0];
     return `<div class="picker-item" onclick="assignGuestToSeat(${g.id})">
@@ -314,7 +314,7 @@ function renderGuestList() {
   const q = (document.getElementById('guestSearch').value || '').toLowerCase();
   const list = q ? guests.filter(g => g.name.toLowerCase().includes(q)) : guests;
   if (!list.length) {
-    panel.innerHTML = `<div style="font-size:12px;color:#888;padding:6px">${guests.length ? 'Brak wyników' : 'Brak gości.'}</div>`;
+    panel.innerHTML = `<div style="font-size:12px;color:#888;padding:6px">${guests.length ? t('no_results') : t('no_guests')}</div>`;
     return;
   }
   panel.innerHTML = list.map(g => {
@@ -333,11 +333,11 @@ function renderGuestList() {
       </div>`;
     return `
       <div class="guest-row clickable${g.tableId ? ' assigned' : ''}">
-        <span class="gtag" style="background:${gc.bg};color:${gc.text}" onclick="cycleGroup(${g.id})" title="Zmień grupę">${gc.label}</span>
+        <span class="gtag" style="background:${gc.bg};color:${gc.text}" onclick="cycleGroup(${g.id})" title="${t('change_group_title')}">${gc.label}</span>
         <span style="flex:1;font-size:12px">${g.name}</span>
         <span style="font-size:11px;color:#888">${tbl ? (tbl.name + (seatNum ? ' #' + seatNum : '')) : '—'}</span>
-        <button class="x-btn" onclick="startEditGuest(${g.id})" title="Edytuj">✎</button>
-        <button class="x-btn" onclick="removeGuest(${g.id})" title="Usuń">×</button>
+        <button class="x-btn" onclick="startEditGuest(${g.id})" title="${t('edit_title')}">✎</button>
+        <button class="x-btn" onclick="removeGuest(${g.id})" title="${t('remove_title')}">×</button>
       </div>`;
   }).join('');
 }
@@ -370,12 +370,12 @@ function renderSeatPanel() {
              ondragleave="this.classList.remove('drag-over')"
              ondrop="seatDrop(${i});this.classList.remove('drag-over')"
              ondragend="seatDragEnd()">
-          <span class="drag-handle" title="Przeciągnij aby zmienić kolejność">⠿</span>
+          <span class="drag-handle" title="${t('drag_to_reorder')}">⠿</span>
           <span class="seat-num">${i + 1}</span>
           <span class="gtag" style="background:${gc.bg};color:${gc.text}">${gc.label}</span>
           <span class="seat-name">${g.name}</span>
           <input type="color" class="chair-color-input" value="${colorVal}"
-                 onchange="setChairColor(${g.id}, this.value)" title="Kolor krzesła">
+                 onchange="setChairColor(${g.id}, this.value)" title="${t('chair_color_title')}">
           <button class="x-btn" onclick="unassignSeat(${i})">×</button>
         </div>`;
     }
@@ -386,7 +386,7 @@ function renderSeatPanel() {
            ondrop="seatDrop(${i});this.classList.remove('drag-over')"
            onclick="openGuestPicker(${i})">
         <span class="seat-num">${i + 1}</span>
-        <span class="seat-empty">wolne — kliknij aby przypisać</span>
+        <span class="seat-empty">${t('empty_seat')}</span>
         <span style="font-size:13px;color:#aaa">+</span>
       </div>`;
   }).join('');
@@ -718,17 +718,17 @@ function processCSVText(text, fname) {
   const ib = document.getElementById('importBtn');
   const lines = text.trim().split(/\r?\n/);
   const err = s => { se.style.display = 'block'; se.innerHTML = `<div style="font-size:12px;color:#A32D2D;padding:6px 8px;background:#FCEBEB;border-radius:6px">${s}</div>`; mb.style.display = 'none'; pb.style.display = 'none'; ib.style.display = 'none'; pendingHeaders = []; pendingRawRows = []; };
-  if (lines.length < 2) { err('Za krótki plik.'); return; }
+  if (lines.length < 2) { err(t('file_too_short')); return; }
   const sep = lines[0].includes(';') ? ';' : ',';
   pendingHeaders = lines[0].split(sep).map(h => h.trim().replace(/^["']|["']$/g, ''));
-  if (!pendingHeaders.length) { err('Nie znaleziono nagłówków.'); return; }
+  if (!pendingHeaders.length) { err(t('no_headers_found')); return; }
   pendingRawRows = [];
   for (let i = 1; i < lines.length; i++) {
     const ln = lines[i].trim(); if (!ln) continue;
     pendingRawRows.push(ln.split(sep).map(x => x.trim().replace(/^["']|["']$/g, '')));
   }
   se.style.display = 'block';
-  se.innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">Wczytano <strong>"${fname}"</strong> — ${pendingRawRows.length} wierszy, ${pendingHeaders.length} kolumn</div>`;
+  se.innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">${t('file_loaded', {name: fname, rows: pendingRawRows.length, cols: pendingHeaders.length})}</div>`;
   mb.style.display = 'block';
   renderColumnPicker();
   applyMapping();
@@ -743,14 +743,14 @@ function renderColumnPicker() {
   const dGroup = find(['grupa','group','kategoria']);
   const dTable = find(['stol','stół','table']);
   const colOpts = (def, withNone) =>
-    (withNone ? `<option value="-1"${def === -1 ? ' selected' : ''}>— brak —</option>` : '') +
+    (withNone ? `<option value="-1"${def === -1 ? ' selected' : ''}>${t('none_option')}</option>` : '') +
     pendingHeaders.map((h, i) => `<option value="${i}"${i === def ? ' selected' : ''}>${h}</option>`).join('');
   document.getElementById('csvMappingBox').innerHTML = `
-    <div class="sec-title" style="margin-top:2px">Mapowanie kolumn</div>
-    <div class="row"><label>Imię / nazwa</label><select id="mapFirst" onchange="applyMapping()">${colOpts(dFirst, false)}</select></div>
-    <div class="row"><label>Nazwisko</label><select id="mapLast" onchange="applyMapping()">${colOpts(dLast, true)}</select></div>
-    <div class="row"><label>Kategoria</label><select id="mapGroup" onchange="applyMapping()">${colOpts(dGroup, true)}</select></div>
-    <div class="row"><label>Stół</label><select id="mapTable" onchange="applyMapping()">${colOpts(dTable, true)}</select></div>`;
+    <div class="sec-title" style="margin-top:2px">${t('column_mapping')}</div>
+    <div class="row"><label>${t('col_first_name')}</label><select id="mapFirst" onchange="applyMapping()">${colOpts(dFirst, false)}</select></div>
+    <div class="row"><label>${t('col_last_name')}</label><select id="mapLast" onchange="applyMapping()">${colOpts(dLast, true)}</select></div>
+    <div class="row"><label>${t('col_category')}</label><select id="mapGroup" onchange="applyMapping()">${colOpts(dGroup, true)}</select></div>
+    <div class="row"><label>${t('col_table')}</label><select id="mapTable" onchange="applyMapping()">${colOpts(dTable, true)}</select></div>`;
 }
 
 function applyMapping() {
@@ -764,11 +764,11 @@ function applyMapping() {
     if (li >= 0 && c[li]) name = (name + ' ' + c[li]).trim();
     const group = gi >= 0 ? (c[gi] || '—') : '—';
     const table = ti >= 0 ? (c[ti] || '—') : '—';
-    return `${name || '(brak)'} | ${group} | ${table}`;
+    return `${name || t('missing_value')} | ${group} | ${table}`;
   });
   const pb = document.getElementById('csvPreviewBox');
   pb.style.display = 'block';
-  document.getElementById('csvPreview').textContent = rows.join('\n') + (pendingRawRows.length > 6 ? '\n…+' + (pendingRawRows.length - 6) + ' więcej' : '');
+  document.getElementById('csvPreview').textContent = rows.join('\n') + (pendingRawRows.length > 6 ? '\n' + t('more_rows', {n: pendingRawRows.length - 6}) : '');
 }
 
 function confirmImport() {
@@ -804,7 +804,7 @@ function confirmImport() {
   document.getElementById('importBtn').style.display = 'none';
   document.getElementById('csvMappingBox').style.display = 'none';
   document.getElementById('csvPreviewBox').style.display = 'none';
-  document.getElementById('csvStatus').innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">Import zakończony! Dodano <strong>${imported}</strong> gości.</div>`;
+  document.getElementById('csvStatus').innerHTML = `<div style="font-size:12px;padding:6px 8px;background:#EAF3DE;border-radius:6px;color:#27500A">${t('import_done', {n: imported})}</div>`;
   renderSidebar(); renderGuestList(); draw(); updateStats(); switchTab('goscie');
 }
 
@@ -824,9 +824,9 @@ function resolveGroup(raw) {
   for (const [key, gc] of Object.entries(groupColors)) {
     if (gc.label.toLowerCase() === rv) return key;
   }
-  if (groupColors.family && ['family','rodzina'].some(x => rv.includes(x))) return 'family';
-  if (groupColors.friend && ['friend','przyjaciel','znajom'].some(x => rv.includes(x))) return 'friend';
-  if (groupColors.work   && ['work','praca'].some(x => rv.includes(x))) return 'work';
+  if (groupColors.family && ['family','rodzina','familia','famille','famiglia','familie',"сім'я","сімья"].some(x => rv.includes(x))) return 'family';
+  if (groupColors.friend && ['friend','przyjaciel','znajom','amigo','ami','amico','freund','друг'].some(x => rv.includes(x))) return 'friend';
+  if (groupColors.work   && ['work','praca','trabajo','travail','lavoro','arbeit','робота'].some(x => rv.includes(x))) return 'work';
   return groupColors.other ? 'other' : Object.keys(groupColors)[0];
 }
 
@@ -859,7 +859,7 @@ function addCategory() {
   const palette = ['#FADADD','#D4F0FF','#D4F5D4','#FFF0D4','#E8D4FF','#FFD4F0','#D4EFEF'];
   const bg = palette[Object.keys(groupColors).length % palette.length];
   const key = 'cat_' + (nextCatId++);
-  groupColors[key] = { bg, text: textForBg(bg), label: 'Kategoria ' + Object.keys(groupColors).length };
+  groupColors[key] = { bg, text: textForBg(bg), label: t('group_new') + ' ' + Object.keys(groupColors).length };
   renderCategoryList(); refreshGroupSelects(); triggerAutoSave();
 }
 
@@ -904,7 +904,7 @@ function exportJPG() {
 }
 
 function exportPDF() {
-  if (!window.jspdf) { alert('Biblioteka jsPDF nie jest załadowana. Sprawdź połączenie z internetem.'); return; }
+  if (!window.jspdf) { alert(t('jspdf_missing')); return; }
   const { jsPDF } = window.jspdf;
   const tmp = getExportCanvas();
   const cw = tmp.width, ch = tmp.height;
@@ -953,7 +953,8 @@ function applyState(s) {
 
 function fmtMeta(e) {
   const d = new Date(e.savedAt);
-  return `${e.tableCount} stołów · ${e.guestCount} gości · ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+  const time = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+  return t('meta_tables', {n: e.tableCount}) + ' · ' + t('meta_guests', {n: e.guestCount}) + ' · ' + time;
 }
 
 function saveCurrentSession() {
@@ -963,7 +964,7 @@ function saveCurrentSession() {
   const idx = getIndex();
   const entry = idx.find(e => e.id === currentSessionId);
   if (entry) { entry.savedAt = state.savedAt; entry.tableCount = tables.length; entry.guestCount = guests.length; }
-  else idx.push({ id: currentSessionId, name: 'Nowy plan', savedAt: state.savedAt, tableCount: tables.length, guestCount: guests.length });
+  else idx.push({ id: currentSessionId, name: t('new_plan'), savedAt: state.savedAt, tableCount: tables.length, guestCount: guests.length });
   saveIndex(idx);
   try { localStorage.setItem(TP_CUR, currentSessionId); } catch (_) {}
 }
@@ -978,7 +979,7 @@ function triggerAutoSave() {
       if (row) { const m = row.querySelector('.session-meta'); if (m) m.textContent = fmtMeta(entry); }
     }
     const el = document.getElementById('autoSaveStatus');
-    if (el) { const n = new Date(); el.textContent = 'Zapisano ' + n.getHours().toString().padStart(2,'0') + ':' + n.getMinutes().toString().padStart(2,'0'); }
+    if (el) { const n = new Date(); el.textContent = t('saved_at', {time: n.getHours().toString().padStart(2,'0') + ':' + n.getMinutes().toString().padStart(2,'0')}); }
   }, 0);
 }
 
@@ -998,7 +999,7 @@ function renderSessionList() {
           <span class="session-meta">${fmtMeta(e)}</span>
         </div>
         <button class="x-btn" onclick="deleteSession('${e.id}')"
-                title="Usuń sesję"${idx.length <= 1 ? ' disabled style="opacity:.35;cursor:default"' : ''}>×</button>
+                title="${t('delete_session_title')}"${idx.length <= 1 ? ' disabled style="opacity:.35;cursor:default"' : ''}>×</button>
       </div>`;
   }).join('');
 }
@@ -1021,7 +1022,7 @@ function deleteSession(id) {
   saveIndex(idx); try { localStorage.removeItem(TP_SESS(id)); } catch (_) {}
   if (id === currentSessionId) {
     if (idx.length) loadSession(idx[idx.length - 1].id);
-    else startNewSession('Nowy plan', true);
+    else startNewSession(t('new_plan'), true);
   } else renderSessionList();
 }
 
@@ -1035,17 +1036,17 @@ function startNewSession(name, withExamples) {
   saveCurrentSession();
   const id = genId(); currentSessionId = id;
   tables = []; guests = [];
-  groupColors = { family:{bg:'#EAF3DE',text:'#27500A',label:'Rodzina'}, friend:{bg:'#EEEDFE',text:'#26215C',label:'Przyjaciel'}, work:{bg:'#FAEEDA',text:'#412402',label:'Praca'}, other:{bg:'#F1EFE8',text:'#2C2C2A',label:'Inne'} };
+  groupColors = { family:{bg:'#EAF3DE',text:'#27500A',label:t('group_family')}, friend:{bg:'#EEEDFE',text:'#26215C',label:t('group_friend')}, work:{bg:'#FAEEDA',text:'#412402',label:t('group_work')}, other:{bg:'#F1EFE8',text:'#2C2C2A',label:t('group_other')} };
   nextTId = 1; nextGId = 1; nextCatId = 1;
   zoom = 0.6; roomW = 1200; roomH = 800;
   document.getElementById('zoomSlider').value = 60; document.getElementById('zoomVal').textContent = '60%';
   if (withExamples) {
-    tables.push({ id: nextTId++, name: 'Młodzi',    shape: 'rect',   wCm: 160, hCm: 90,  seats: 2,  color: '#85B7EB', angle: 0,  x: 820, y: 180, seatGuests: [null, null] });
-    tables.push({ id: nextTId++, name: 'Rodzina A', shape: 'circle', wCm: 180, hCm: 180, seats: 10, color: '#5DCAA5', angle: 0,  x: 350, y: 540, seatGuests: Array(10).fill(null) });
-    tables.push({ id: nextTId++, name: 'Stół 1',    shape: 'rect',   wCm: 180, hCm: 90,  seats: 8,  color: '#EF9F27', angle: 45, x: 800, y: 500, seatGuests: Array(8).fill(null) });
+    tables.push({ id: nextTId++, name: t('example_couple'),        shape: 'rect',   wCm: 160, hCm: 90,  seats: 2,  color: '#85B7EB', angle: 0,  x: 820, y: 180, seatGuests: [null, null] });
+    tables.push({ id: nextTId++, name: t('example_family') + ' A', shape: 'circle', wCm: 180, hCm: 180, seats: 10, color: '#5DCAA5', angle: 0,  x: 350, y: 540, seatGuests: Array(10).fill(null) });
+    tables.push({ id: nextTId++, name: t('default_table_name') + ' 1', shape: 'rect', wCm: 180, hCm: 90, seats: 8, color: '#EF9F27', angle: 45, x: 800, y: 500, seatGuests: Array(8).fill(null) });
   }
   const idx = getIndex();
-  idx.push({ id, name: name || 'Nowy plan', savedAt: new Date().toISOString(), tableCount: tables.length, guestCount: guests.length });
+  idx.push({ id, name: name || t('new_plan'), savedAt: new Date().toISOString(), tableCount: tables.length, guestCount: guests.length });
   saveIndex(idx); try { localStorage.setItem(TP_CUR, id); } catch (_) {}
   selected = null; document.getElementById('propsPanel').style.display = 'none';
   updateRoomLabel(); resizeCanvas(); renderSidebar(); renderGuestList(); updateStats(); renderCategoryList(); refreshGroupSelects();
@@ -1064,7 +1065,7 @@ function startNewSession(name, withExamples) {
         saveIndex([{ id, name: 'Mój plan', savedAt: s.savedAt || new Date().toISOString(), tableCount: (s.tables||[]).length, guestCount: (s.guests||[]).length }]);
         localStorage.setItem(TP_SESS(id), old); localStorage.setItem(TP_CUR, id);
         localStorage.removeItem('tableplaner_v1');
-        applyState(s); renderSessionList(); return;
+        applyState(s); renderSessionList(); applyLocale(); return;
       }
     }
   } catch (_) {}
@@ -1076,10 +1077,11 @@ function startNewSession(name, withExamples) {
   if (toLoad) {
     try {
       const raw = localStorage.getItem(TP_SESS(toLoad));
-      if (raw && applyState(JSON.parse(raw))) { currentSessionId = toLoad; renderSessionList(); return; }
+      if (raw && applyState(JSON.parse(raw))) { currentSessionId = toLoad; renderSessionList(); applyLocale(); return; }
     } catch (_) {}
   }
 
   // First run — create default session with example data
-  startNewSession('Mój plan', true);
+  startNewSession(t('my_plan'), true);
+  applyLocale();
 }());
