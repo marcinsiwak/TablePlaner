@@ -190,8 +190,8 @@ Piotr,Nowak,family,</div>
       <span>|</span>
       <span id="roomDimLabel">1200×800 cm</span>
       <span data-i18n="canvas_hint" style="font-size:11px">Przeciągnij · kliknij aby zaznaczyć · ← → obracaj</span>
-      <button class="btn btn-sm" style="margin-left:auto" onclick="exportJPG()" data-i18n-title="export_jpg_title" title="Eksportuj jako JPG">↓ JPG</button>
-      <button class="btn btn-sm" onclick="exportPDF()" data-i18n-title="export_pdf_title" title="Eksportuj jako PDF">↓ PDF</button>
+      <button class="btn btn-sm" style="margin-left:auto" onclick="openExportPopup('jpg')" data-i18n-title="export_jpg_title" title="Eksportuj jako JPG">↓ JPG</button>
+      <button class="btn btn-sm" onclick="openExportPopup('pdf')" data-i18n-title="export_pdf_title" title="Eksportuj jako PDF">↓ PDF</button>
       <span>|</span>
       <a href="https://buycoffee.to/marcinsiwak" target="_blank" rel="noopener" class="btn btn-sm coffee-btn">☕ Buy me a coffee</a>
       <select id="langSelect" onchange="setLanguage(this.value)" class="lang-select">
@@ -261,6 +261,21 @@ Piotr,Nowak,family,</div>
   <button class="btn btn-sm" style="margin-top:6px" onclick="closeGuestPicker()" data-i18n="cancel">Anuluj</button>
 </div>
 
+<!-- Coffee popup -->
+<div id="coffeePopup" class="coffee-overlay" style="display:none" onclick="if(event.target===this)dismissCoffeePopup(false)">
+  <div class="coffee-modal">
+    <div class="coffee-emoji">☕</div>
+    <div class="coffee-modal-title" data-i18n="coffee_title">Podoba Ci się TablePlaner? ☕</div>
+    <div class="coffee-modal-text" data-i18n="coffee_text">Jeśli ta aplikacja pomogła Ci zaplanować wielki dzień, postaw mi kawę!</div>
+    <div class="coffee-modal-btns">
+      <a href="https://buycoffee.to/marcinsiwak" target="_blank" rel="noopener"
+         class="btn btn-primary coffee-btn coffee-modal-primary" onclick="dismissCoffeePopup(false)"
+         data-i18n="coffee_btn">☕ Postaw mi kawę</a>
+      <button class="btn coffee-modal-skip" onclick="dismissCoffeePopup(false)" data-i18n="coffee_skip">Po prostu pobierz</button>
+    </div>
+  </div>
+</div>
+
 <style>
   .picker-item {
     padding: 5px 7px; border-radius: 6px; cursor: pointer;
@@ -280,6 +295,51 @@ Piotr,Nowak,family,</div>
     white-space: nowrap;
   }
   .coffee-btn:hover { background: #f9e0a0; }
+
+  /* Export coffee popup */
+  .coffee-overlay {
+    position: fixed; inset: 0; z-index: 2000;
+    background: rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .coffee-modal {
+    background: #fff; border-radius: 16px;
+    padding: 32px 28px 24px;
+    max-width: 360px; width: 92%;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+    animation: coffeeIn .18s ease;
+  }
+  @keyframes coffeeIn {
+    from { transform: scale(.93); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+  .coffee-emoji { font-size: 40px; margin-bottom: 10px; }
+  .coffee-modal-title {
+    font-size: 16px; font-weight: 600;
+    color: var(--color-text-primary, #1a1a18);
+    margin-bottom: 10px; line-height: 1.3;
+  }
+  .coffee-modal-text {
+    font-size: 13px; color: var(--color-text-secondary, #6b6962);
+    line-height: 1.6; margin-bottom: 22px;
+  }
+  .coffee-modal-btns { display: flex; flex-direction: column; gap: 8px; }
+  .coffee-modal-primary {
+    display: block; text-decoration: none;
+    font-size: 14px; padding: 10px 16px;
+    background: #FDECC8; color: #7A4F1D;
+    border: 1px solid #e8c97a; border-radius: 8px;
+    cursor: pointer; font-weight: 600;
+    transition: background .15s;
+  }
+  .coffee-modal-primary:hover { background: #f9e0a0; }
+  .coffee-modal-skip {
+    font-size: 12px; color: var(--color-text-secondary, #6b6962);
+    background: transparent; border: none; cursor: pointer;
+    padding: 6px; text-decoration: underline; text-underline-offset: 2px;
+  }
+  .coffee-modal-skip:hover { color: var(--color-text-primary, #1a1a18); }
 </style>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>

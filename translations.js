@@ -46,6 +46,10 @@ const TRANSLATIONS = {
     group_family:'Rodzina', group_friend:'Przyjaciel', group_work:'Praca', group_other:'Inne',
     group_new:'Kategoria', language:'Język',
     example_couple:'Młodzi', example_family:'Rodzina',
+    coffee_title:'Podoba Ci się TablePlaner? ☕',
+    coffee_text:'Jeśli ta aplikacja pomogła Ci zaplanować wielki dzień, postaw mi kawę — dzięki temu aplikacja pozostaje darmowa!',
+    coffee_btn:'☕ Postaw mi kawę',
+    coffee_skip:'Po prostu pobierz',
   },
   en: {
     tab_sala:'Hall', tab_tables:'Tables', tab_guests:'Guests', tab_import:'Import',
@@ -93,6 +97,10 @@ const TRANSLATIONS = {
     group_family:'Family', group_friend:'Friend', group_work:'Work', group_other:'Other',
     group_new:'Category', language:'Language',
     example_couple:'Couple', example_family:'Family',
+    coffee_title:'Enjoying TablePlaner? ☕',
+    coffee_text:'If this app helped you plan your special day, consider buying me a coffee — it keeps the app free and maintained!',
+    coffee_btn:'☕ Buy me a coffee',
+    coffee_skip:'Just download',
   },
   es: {
     tab_sala:'Sala', tab_tables:'Mesas', tab_guests:'Invitados', tab_import:'Importar',
@@ -140,6 +148,10 @@ const TRANSLATIONS = {
     group_family:'Familia', group_friend:'Amigo', group_work:'Trabajo', group_other:'Otro',
     group_new:'Categoría', language:'Idioma',
     example_couple:'Novios', example_family:'Familia',
+    coffee_title:'¿Te gusta TablePlaner? ☕',
+    coffee_text:'Si esta aplicación te ayudó a planificar tu gran día, ¡invítame a un café y mantén la app gratuita!',
+    coffee_btn:'☕ Invítame a un café',
+    coffee_skip:'Solo descargar',
   },
   it: {
     tab_sala:'Sala', tab_tables:'Tavoli', tab_guests:'Ospiti', tab_import:'Importa',
@@ -187,6 +199,10 @@ const TRANSLATIONS = {
     group_family:'Famiglia', group_friend:'Amico', group_work:'Lavoro', group_other:'Altro',
     group_new:'Categoria', language:'Lingua',
     example_couple:'Sposi', example_family:'Famiglia',
+    coffee_title:'Ti piace TablePlaner? ☕',
+    coffee_text:"Se questa app ti ha aiutato a pianificare il grande giorno, offrimi un caffè — mantiene l'app gratuita!",
+    coffee_btn:'☕ Offrimi un caffè',
+    coffee_skip:'Solo scarica',
   },
   fr: {
     tab_sala:'Salle', tab_tables:'Tables', tab_guests:'Invités', tab_import:'Importer',
@@ -234,6 +250,10 @@ const TRANSLATIONS = {
     group_family:'Famille', group_friend:'Ami', group_work:'Travail', group_other:'Autre',
     group_new:'Catégorie', language:'Langue',
     example_couple:'Mariés', example_family:'Famille',
+    coffee_title:'Vous aimez TablePlaner ? ☕',
+    coffee_text:"Si cette application vous a aidé à planifier votre grand jour, offrez-moi un café — cela garde l'app gratuite !",
+    coffee_btn:'☕ Offrez-moi un café',
+    coffee_skip:'Juste télécharger',
   },
   de: {
     tab_sala:'Saal', tab_tables:'Tische', tab_guests:'Gäste', tab_import:'Import',
@@ -281,6 +301,10 @@ const TRANSLATIONS = {
     group_family:'Familie', group_friend:'Freund', group_work:'Arbeit', group_other:'Andere',
     group_new:'Kategorie', language:'Sprache',
     example_couple:'Brautpaar', example_family:'Familie',
+    coffee_title:'Gefällt Ihnen TablePlaner? ☕',
+    coffee_text:'Wenn diese App Ihnen bei der Planung Ihres großen Tages geholfen hat, spendieren Sie mir einen Kaffee — damit bleibt die App kostenlos!',
+    coffee_btn:'☕ Kaffee spendieren',
+    coffee_skip:'Einfach herunterladen',
   },
   uk: {
     tab_sala:'Зала', tab_tables:'Столи', tab_guests:'Гості', tab_import:'Імпорт',
@@ -328,6 +352,10 @@ const TRANSLATIONS = {
     group_family:"Сім'я", group_friend:'Друг', group_work:'Робота', group_other:'Інше',
     group_new:'Категорія', language:'Мова',
     example_couple:'Молодята', example_family:"Сім'я",
+    coffee_title:'Подобається TablePlaner? ☕',
+    coffee_text:'Якщо цей застосунок допоміг вам спланувати особливий день, пригостіть мене кавою — це підтримує безкоштовну роботу!',
+    coffee_btn:'☕ Пригостити кавою',
+    coffee_skip:'Просто завантажити',
   },
 };
 

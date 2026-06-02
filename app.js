@@ -688,7 +688,7 @@ canvas.addEventListener('touchend', () => { if (rotating) renderSidebar(); rotat
 
 // ── Keyboard shortcuts ─────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeGuestPicker(); cancelEdit(); }
+  if (e.key === 'Escape') { closeGuestPicker(); cancelEdit(); dismissCoffeePopup(false); }
   if (selected !== null && !e.target.matches('input,select,textarea')) {
     if (e.key === 'ArrowLeft')  rotateSelected(-5);
     if (e.key === 'ArrowRight') rotateSelected(5);
@@ -882,6 +882,21 @@ function renameCategory(key, label) {
   if (!groupColors[key] || !label.trim()) return;
   groupColors[key].label = label.trim();
   refreshGroupSelects(); renderGuestList();
+}
+
+// ── Export popup ──────────────────────────────────────────────────────────────
+let _pendingExport = null;
+
+function openExportPopup(type) {
+  _pendingExport = type;
+  document.getElementById('coffeePopup').style.display = 'flex';
+}
+
+function dismissCoffeePopup(doCoffee) {
+  document.getElementById('coffeePopup').style.display = 'none';
+  const type = _pendingExport; _pendingExport = null;
+  if (type === 'jpg') exportJPG();
+  else if (type === 'pdf') exportPDF();
 }
 
 // ── Export ─────────────────────────────────────────────────────────────────────
