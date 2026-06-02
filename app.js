@@ -404,9 +404,9 @@ function selectTable(i) {
 
 function renderSeatPanel() {
   if (selected === null) return;
-  const t = tables[selected]; ensureSeatArray(t);
-  document.getElementById('seatPanel').innerHTML = Array.from({ length: t.seats }, (_, i) => {
-    const gid = t.seatGuests[i];
+  const tbl = tables[selected]; ensureSeatArray(tbl);
+  document.getElementById('seatPanel').innerHTML = Array.from({ length: tbl.seats }, (_, i) => {
+    const gid = tbl.seatGuests[i];
     const g   = gid ? guests.find(x => x.id === gid) : null;
     const gc  = g ? (groupColors[g.group] || groupColors.other || Object.values(groupColors)[0]) : null;
     if (g) {
