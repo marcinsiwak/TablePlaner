@@ -844,7 +844,7 @@ canvas.addEventListener('touchend', () => {
 
 // ── Keyboard shortcuts ─────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeGuestPicker(); cancelEdit(); dismissCoffeePopup(false); }
+  if (e.key === 'Escape') { closeGuestPicker(); cancelEdit(); dismissCoffeePopup(false); closeShareModal(); }
   if (selected !== null && !e.target.matches('input,select,textarea')) {
     if (e.key === 'ArrowLeft')  rotateSelected(-5);
     if (e.key === 'ArrowRight') rotateSelected(5);
@@ -1113,6 +1113,64 @@ let sidebarWidth = (() => {
     try { localStorage.setItem(SIDEBAR_W_KEY, sidebarWidth); } catch (_) {}
   });
 }());
+
+// ── Share (JSON export / import) ───────────────────────────────────────────────
+function openShareModal() {
+  document.getElementById('shareStatus').textContent = '';
+  document.getElementById('shareFileInput').value = '';
+  document.getElementById('shareModal').style.display = 'flex';
+}
+
+function closeShareModal() {
+  document.getElementById('shareModal').style.display = 'none';
+}
+
+function exportSessionJSON() {
+  const state = buildSaveState();
+  const payload = Object.assign({ tableplaner: true }, state);
+  const idx = getIndex();
+  const entry = idx.find(e => e.id === currentSessionId);
+  const name = (entry ? entry.name : t('my_plan')).replace(/[^a-z0-9_\-\s]/gi, '_');
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name + '.tableplaner.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importSessionJSON(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const statusEl = document.getElementById('shareStatus');
+  const fr = new FileReader();
+  fr.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!data.tableplaner || data.version !== 1) throw new Error('bad format');
+      saveCurrentSession();
+      const id = genId();
+      currentSessionId = id;
+      const idx = getIndex();
+      const name = file.name.replace(/\.tableplaner\.json$/i, '').replace(/\.json$/i, '') || t('my_plan');
+      idx.push({ id, name, savedAt: new Date().toISOString(), tableCount: (data.tables || []).length, guestCount: (data.guests || []).length });
+      saveIndex(idx);
+      try { localStorage.setItem(TP_SESS(id), JSON.stringify(Object.assign({}, data, { tableplaner: undefined }))); } catch (_) {}
+      try { localStorage.setItem(TP_CUR, id); } catch (_) {}
+      applyState(data);
+      renderSessionList();
+      applyLocale();
+      buildSwatches('newColorSwatches', newColor, 'pickNewColor');
+      statusEl.style.color = '#27500A';
+      statusEl.textContent = t('share_import_ok');
+      setTimeout(() => { statusEl.textContent = ''; switchTab('goscie'); }, 1600);
+    } catch (_) {
+      statusEl.style.color = '#A32D2D';
+      statusEl.textContent = t('share_import_err');
+    }
+  };
+  fr.readAsText(file, 'UTF-8');
+}
 
 // ── Export popup ──────────────────────────────────────────────────────────────
 let _pendingExport = null;

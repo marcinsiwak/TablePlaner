@@ -168,6 +168,12 @@
 Anna,Kowalska,family,Rodzina
 Piotr,Nowak,family,</div>
       <button class="btn" style="margin-top:4px" onclick="loadExample()" data-i18n="load_example">📄 Wczytaj przykład</button>
+      <hr class="sep">
+      <div class="sec-title" data-i18n="share_import_label">Importuj</div>
+      <div style="font-size:12px;color:#888;line-height:1.6" data-i18n="share_import_desc">Wczytaj plan z pliku JSON otrzymanego od innej osoby.</div>
+      <button class="btn" onclick="document.getElementById('shareFileInput').click()" data-i18n="share_import_btn">Wczytaj plik JSON</button>
+      <input type="file" id="shareFileInput" accept=".json" style="display:none" onchange="importSessionJSON(event)">
+      <div id="shareStatus" style="font-size:12px;min-height:18px"></div>
     </div>
   </div>
 
@@ -181,7 +187,9 @@ Piotr,Nowak,family,</div>
       <span>|</span>
       <span id="roomDimLabel">1200×800 cm</span>
       <span data-i18n="canvas_hint" style="font-size:11px">Przeciągnij · kliknij aby zaznaczyć · ← → obracaj</span>
-      <button class="btn btn-sm" style="margin-left:auto" onclick="openExportPopup('jpg')" data-i18n-title="export_jpg_title" title="Eksportuj jako JPG">↓ JPG</button>
+      <button class="btn btn-sm share-btn" style="margin-left:auto" onclick="openShareModal()" data-i18n="share">Udostępnij</button>
+      <span>|</span>
+      <button class="btn btn-sm" onclick="openExportPopup('jpg')" data-i18n-title="export_jpg_title" title="Eksportuj jako JPG">↓ JPG</button>
       <button class="btn btn-sm" onclick="openExportPopup('png')" data-i18n-title="export_png_title" title="Export as PNG">↓ PNG</button>
       <button class="btn btn-sm" onclick="openExportPopup('pdf')" data-i18n-title="export_pdf_title" title="Eksportuj jako PDF">↓ PDF</button>
       <span>|</span>
@@ -271,6 +279,21 @@ Piotr,Nowak,family,</div>
   <button class="btn btn-sm" style="margin-top:6px" onclick="closeGuestPicker()" data-i18n="cancel">Anuluj</button>
 </div>
 
+<!-- Share modal -->
+<div id="shareModal" class="coffee-overlay" style="display:none" onclick="if(event.target===this)closeShareModal()">
+  <div class="share-modal">
+    <div class="share-modal-title" data-i18n="share_title">Udostępnij plan</div>
+
+    <div class="share-section">
+      <div class="share-section-label" data-i18n="share_export_label">Eksportuj</div>
+      <div class="share-desc" data-i18n="share_export_desc">Pobierz bieżący plan jako plik JSON i wyślij go innym osobom.</div>
+      <button class="btn btn-primary" onclick="exportSessionJSON()" data-i18n="share_download">Pobierz JSON</button>
+    </div>
+
+    <button class="btn coffee-modal-skip" onclick="closeShareModal()" data-i18n="cancel">Anuluj</button>
+  </div>
+</div>
+
 <!-- Coffee popup -->
 <div id="coffeePopup" class="coffee-overlay" style="display:none" onclick="if(event.target===this)dismissCoffeePopup(false)">
   <div class="coffee-modal">
@@ -298,6 +321,24 @@ Piotr,Nowak,family,</div>
     border-radius: 4px; background: var(--color-bg-primary, #fff);
     cursor: pointer; color: var(--color-text-primary, #2c2c2a);
   }
+  .share-btn {
+    background: var(--color-accent, #378ADD);
+    color: #fff;
+    border-color: var(--color-accent, #378ADD) !important;
+  }
+  .share-btn:hover { opacity: 0.88; }
+  .share-modal {
+    background: #fff; border-radius: 16px;
+    padding: 28px 28px 22px; max-width: 380px; width: 92%;
+    display: flex; flex-direction: column; gap: 16px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.22);
+    animation: coffeeIn .18s ease;
+  }
+  .share-modal-title { font-size: 16px; font-weight: 600; color: var(--color-text-primary, #1a1a18); }
+  .share-section { display: flex; flex-direction: column; gap: 8px; }
+  .share-section-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--color-text-secondary, #6b6962); }
+  .share-desc { font-size: 12px; color: var(--color-text-secondary, #6b6962); line-height: 1.5; }
+  .share-divider { border: none; border-top: 1px solid var(--color-border-tertiary, #e5e3de); }
   .coffee-btn {
     text-decoration: none;
     background: #FDECC8; color: #7A4F1D;
